@@ -3,8 +3,7 @@ import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../constants/styles';
-import { db } from '../../services/firebaseconfig';
-
+import { auth, db } from '../../services/firebaseconfig';
 
 export default function ScoringScreen() {
   const { compID } = useLocalSearchParams();
@@ -12,15 +11,27 @@ export default function ScoringScreen() {
   const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
   const [score, setScore] = useState('');
   
-  // Novo estado para guardar as notas que ESTE juiz já deu
-  const [myPastScores, setMyPastScores] = useState<any[]>([]);
-  const JUDGE_ID = 'juiz_teste_1'; // Fixo por enquanto, depois pegaremos do login
+  const [JUDGE_ID, setJUDGE_ID] = useState<string>('juiz_teste_1');
+  const [waveCountMap, setWaveCountMap] = useState<Record<string, number>>({});
 
+  // 1. Identifica o usuário logado
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((user) => {
+      if (user?.uid) {
+        setJUDGE_ID(user.uid);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // 2. Busca a Bateria Ao Vivo (Live)
   useEffect(() => {
     if (!compID) return;
     const catsRef = collection(db, 'competitions', compID as string, 'categories');
     
     const unsubscribeCats = onSnapshot(catsRef, (catsSnap) => {
+      let foundActiveHeat = false;
+      
       catsSnap.forEach(catDoc => {
         const heatsRef = collection(db, 'competitions', compID as string, 'categories', catDoc.id, 'heats');
         const q = query(heatsRef, where('status', '==', 'live'));
@@ -29,19 +40,7 @@ export default function ScoringScreen() {
           if (!heatsSnap.empty) {
             const heatData = { id: heatsSnap.docs[0].id, catID: catDoc.id, ...heatsSnap.docs[0].data() };
             setLiveHeat(heatData);
-
-            // Assim que acha a bateria ao vivo, busca as notas desse juiz para saber a contagem de ondas
-            const wavesRef = collection(db, 'waves');
-            const qWaves = query(wavesRef, where('heatID', '==', heatData.id), where('judgeId', '==', JUDGE_ID));
-            onSnapshot(qWaves, (wavesSnap) => {
-              if (!wavesSnap || !wavesSnap.docs) {
-                setMyPastScores([]);
-                return;
-              }
-
-              setMyPastScores(wavesSnap.docs.map(d => d.data()));
-            });
-
+            foundActiveHeat = true;
           } else {
             setLiveHeat((prev: any) => (prev?.catID === catDoc.id ? null : prev));
           }
@@ -52,10 +51,44 @@ export default function ScoringScreen() {
     return () => unsubscribeCats();
   }, [compID]);
 
-  // Calcula qual onda o atleta está pegando baseado em quantas notas o juiz já deu pra ele
-  const getCurrentWaveNumber = (athleteName: string) => {
-    const scoresForThisAthlete = myPastScores.filter(w => w.athlete === athleteName);
-    return scoresForThisAthlete.length + 1; // Se deu 0 notas, é a onda 1. Se deu 1, é a onda 2.
+  // 3. Escuta em TEMPO REAL as ondas dadas ESPECIFICAMENTE por este juiz nesta bateria
+  useEffect(() => {
+    if (!liveHeat?.id || !JUDGE_ID) {
+      setWaveCountMap({});
+      return;
+    }
+
+    const wavesRef = collection(db, 'waves');
+    const qWaves = query(
+      wavesRef, 
+      where('heatID', '==', liveHeat.id), 
+      where('judgeId', '==', JUDGE_ID)
+    );
+
+    const unsubscribeWaves = onSnapshot(qWaves, (wavesSnap) => {
+      const countMap: Record<string, number> = {};
+
+      wavesSnap.docs.forEach(doc => {
+        const data = doc.data();
+        const athleteName = data.athlete;
+        const waveNum = data.waveNumber || 1;
+
+        // Armazena sempre o maior número de onda registrado para cada atleta por este juiz
+        if (!countMap[athleteName] || waveNum > countMap[athleteName]) {
+          countMap[athleteName] = waveNum;
+        }
+      });
+
+      setWaveCountMap(countMap);
+    });
+
+    return () => unsubscribeWaves();
+  }, [liveHeat?.id, JUDGE_ID]);
+
+  // Retorna a próxima onda que o juiz deve dar para o atleta
+  const getNextWaveNumberForAthlete = (athleteName: string) => {
+    const lastWaveGiven = waveCountMap[athleteName] || 0;
+    return lastWaveGiven + 1;
   };
 
   const submitScore = async () => {
@@ -64,7 +97,7 @@ export default function ScoringScreen() {
       return;
     }
 
-    const waveNumber = getCurrentWaveNumber(selectedAthlete.name);
+    const waveNumber = getNextWaveNumberForAthlete(selectedAthlete.name);
 
     try {
       await addDoc(collection(db, 'waves'), {
@@ -74,7 +107,7 @@ export default function ScoringScreen() {
         lycra: selectedAthlete.lycra,
         score: parseFloat(score),
         judgeId: JUDGE_ID,
-        waveNumber: waveNumber, // SALVANDO O NÚMERO DA ONDA!
+        waveNumber: waveNumber,
         timestamp: new Date().toISOString()
       });
 
@@ -107,10 +140,8 @@ export default function ScoringScreen() {
         <>
           <Text style={{ fontSize: 18, marginBottom: 16, textAlign: 'center' }}>De quem foi a onda?</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {/* 1. Verificação dupla: liveHeat existe? athletes existe? */}
             {(liveHeat?.athletes ?? []).map((ath: any, i: number) => {
-              // 2. Segurança extra para o cálculo da onda, caso 'ath' ou 'ath.name' sejam nulos
-              const waveNum = ath?.name ? getCurrentWaveNumber(ath.name) : 0;
+              const waveNum = ath?.name ? getNextWaveNumberForAthlete(ath.name) : 1;
               
               return (
                 <TouchableOpacity
@@ -148,7 +179,7 @@ export default function ScoringScreen() {
       ) : (
         <View style={globalStyles.card}>
           <Text style={[globalStyles.title, { textAlign: 'center', color: '#0284C7' }]}>
-            ONDA {getCurrentWaveNumber(selectedAthlete.name)}
+            ONDA {getNextWaveNumberForAthlete(selectedAthlete.name)}
           </Text>
           <Text style={[globalStyles.label, { textAlign: 'center' }]}>{selectedAthlete.name} ({selectedAthlete.lycra})</Text>
           

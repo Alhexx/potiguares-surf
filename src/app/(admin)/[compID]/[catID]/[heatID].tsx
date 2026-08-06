@@ -5,7 +5,6 @@ import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../../../constants/styles';
 import { db } from '../../../../services/firebaseconfig';
 
-// Interfaces para tipagem estrita
 interface Athlete {
   name: string;
   lycra: string;
@@ -42,13 +41,11 @@ export default function HeatControlScreen() {
 
     const wavesRef = collection(db, 'waves');
     const q = query(wavesRef, where('heatID', '==', heatID as string));
-    
     const unsubscribeWaves = onSnapshot(q, (snap) => {
       if (!snap || !snap.docs) {
         setWaves([]);
         return;
       }
-
       const receivedNotes = snap.docs.map(d => ({ id: d.id, ...d.data() } as Wave));
       receivedNotes.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setWaves(receivedNotes);
@@ -71,7 +68,6 @@ export default function HeatControlScreen() {
 
   const calculateWSL = (athleteName: string) => {
     const athleteNotes = waves.filter(w => w.athlete === athleteName);
-    
     const wavesGrouped: Record<number, number[]> = {};
     athleteNotes.forEach(w => {
       if (!wavesGrouped[w.waveNumber]) wavesGrouped[w.waveNumber] = [];
@@ -99,7 +95,7 @@ export default function HeatControlScreen() {
       total: total.toFixed(2),
       onda1: top2[0] ? top2[0].toFixed(2) : '0.00',
       onda2: top2[1] ? top2[1].toFixed(2) : '0.00',
-      qtdOndas: waveAverages.length
+      qtdOndas: waveAverages.length,
     };
   };
 
@@ -154,7 +150,9 @@ export default function HeatControlScreen() {
         ) : (
           waves.map((item) => (
             <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F3F4F6' }}>
-              <Text style={{ color: '#374151', fontSize: 16 }}>{item.athlete} <Text style={{ fontWeight: 'bold' }}>(Onda {item.waveNumber})</Text></Text>
+              <Text style={{ color: '#374151', fontSize: 16 }}>
+                {item.athlete} <Text style={{ fontWeight: 'bold' }}>{'Onda ' + item.waveNumber}</Text>
+              </Text>
               <Text style={{ color: '#0284C7', fontWeight: 'bold', fontSize: 16 }}>{item.score.toFixed(1)}</Text>
             </View>
           ))

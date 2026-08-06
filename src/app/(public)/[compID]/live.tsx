@@ -8,11 +8,19 @@ export default function PublicLiveScore() {
   const { compID } = useLocalSearchParams();
   const [liveHeat, setLiveHeat] = useState<any>(null);
   const [waves, setWaves] = useState<any[]>([]);
+  const [totalJudges, setTotalJudges] = useState<number>(0);
 
   useEffect(() => {
     if (!compID) return;
 
-    // 1. Caça qual bateria está "Live" nesta competição
+    // 1. Busca quantos juízes estão cadastrados nesta competição
+    const judgesRef = collection(db, 'competitions', compID as string, 'judges');
+    const unsubJudges = onSnapshot(judgesRef, (judgesSnap) => {
+      // Se por acaso não houver juízes cadastrados no banco, usamos um fallback seguro (ex: 3 ou 4)
+      setTotalJudges(judgesSnap.size > 0 ? judgesSnap.size : 1);
+    });
+
+    // 2. Caça qual bateria está "Live" nesta competição
     const catsRef = collection(db, 'competitions', compID as string, 'categories');
     const unsubscribeCats = onSnapshot(catsRef, (catsSnap) => {
       let foundLive = false;
@@ -26,7 +34,7 @@ export default function PublicLiveScore() {
             const heatData = { id: heatsSnap.docs[0].id, catID: catDoc.id, ...heatsSnap.docs[0].data() };
             setLiveHeat(heatData);
 
-            // 2. Busca as notas dessa bateria
+            // 3. Busca as notas dessa bateria
             const wavesRef = collection(db, 'waves');
             const qWaves = query(wavesRef, where('heatID', '==', heatData.id));
             onSnapshot(qWaves, (wavesSnap) => {
@@ -38,10 +46,13 @@ export default function PublicLiveScore() {
       if (!foundLive) setLiveHeat(null);
     });
 
-    return () => unsubscribeCats();
+    return () => {
+      unsubJudges();
+      unsubscribeCats();
+    };
   }, [compID]);
 
-  // O MESMO MOTOR WSL PARA EXIBIR AS NOTAS EXATAS
+  // MOTOR WSL COM TRAVA DE TODOS OS JUIZES
   const calculateWSL = (athleteName: string) => {
     const athleteNotes = waves.filter(w => w.athlete === athleteName);
     const wavesGrouped: { [key: number]: number[] } = {};
@@ -52,19 +63,26 @@ export default function PublicLiveScore() {
     });
 
     const waveAverages: number[] = [];
+
+    // Percorre cada onda surfada pelo atleta
     for (const wNum in wavesGrouped) {
       const scores = wavesGrouped[wNum];
-      if (scores.length < 3) {
-        waveAverages.push(scores.reduce((a, b) => a + b, 0) / scores.length);
-      } else {
-        const sorted = scores.sort((a, b) => a - b);
-        const trimmed = sorted.slice(1, -1);
-        waveAverages.push(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
+
+      // TRAVA DE SEGURANÇA: Só processa a onda se o número de notas recebidas 
+      // for igual ao total de juízes cadastrados no evento!
+      if (scores.length >= totalJudges) {
+        if (scores.length < 3) {
+          waveAverages.push(scores.reduce((a, b) => a + b, 0) / scores.length);
+        } else {
+          const sorted = [...scores].sort((a, b) => a - b);
+          const trimmed = sorted.slice(1, -1); // Descarta maior e menor (formato WSL)
+          waveAverages.push(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
+        }
       }
     }
 
     waveAverages.sort((a, b) => b - a);
-    const top2 = waveAverages.slice(0, 2);
+    const top2 = waveAverages.slice(0, 2); // Pega as 2 melhores ondas computadas
     const total = top2.reduce((a, b) => a + b, 0);
 
     return {
@@ -88,7 +106,6 @@ export default function PublicLiveScore() {
     );
   }
 
-  // Ordena os atletas do maior placar para o menor (Posição de 1º a 4º)
   const sortedAthletes = [...(liveHeat.athletes || [])].sort((a, b) => {
     return parseFloat(calculateWSL(b.name).total) - parseFloat(calculateWSL(a.name).total);
   });
@@ -141,7 +158,7 @@ export default function PublicLiveScore() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111827', padding: 16 }, // Fundo escuro para contrastar
+  container: { flex: 1, backgroundColor: '#111827', padding: 16 },
   centerContainer: { flex: 1, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center' },
   waitingText: { color: '#FFFFFF', fontSize: 24, fontWeight: 'bold' },
   header: { alignItems: 'center', marginBottom: 24, marginTop: 40 },
