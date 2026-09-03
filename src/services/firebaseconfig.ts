@@ -4,6 +4,7 @@ import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 // @ts-expect-error
 import { Auth, getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -22,9 +23,12 @@ let auth: Auth;
 try {
   app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   db = getFirestore(app);
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-  });
+  auth =
+    Platform.OS === 'web'
+      ? getAuth(app) // web usa a persistência do navegador
+      : initializeAuth(app, {
+          persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+        });
 } catch (e) {
   console.error('Firebase init error:', e);
   app = getApp();

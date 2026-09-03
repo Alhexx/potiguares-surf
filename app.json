@@ -16,8 +16,8 @@
       "package": "com.alhexx.potiguaressurf"
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
