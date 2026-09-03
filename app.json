@@ -38,12 +38,7 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true,
-            "kotlinVersion": "2.1.0",
-            "enableHermes": true,
-            "minSdkVersion": 24,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35
+            "usesCleartextTraffic": true
           }
         }
       ]
