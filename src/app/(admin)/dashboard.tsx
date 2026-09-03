@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { addDoc, collection, onSnapshot, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../lib/notify';
 import { db } from '../../services/firebaseconfig';
 
 // Interface para garantir a tipagem dos dados da competição
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
 
   const handleCreateCompetition = async () => {
     if (name.trim() === '' || location.trim() === '') {
-      Alert.alert('Erro', 'Preencha o nome e o local do evento.');
+      notify('Erro', 'Preencha o nome e o local do evento.');
       return;
     }
     try {
@@ -54,12 +55,12 @@ export default function AdminDashboard() {
         location,
         status: 'active',
       });
-      Alert.alert('Sucesso!', 'Competição criada com sucesso.');
+      notify('Sucesso!', 'Competição criada com sucesso.');
       setName('');
       setLocation('');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      Alert.alert('Erro ao salvar', message);
+      notify('Erro ao salvar', message);
     }
   };
 

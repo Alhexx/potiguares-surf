@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, onSnapshot } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../../lib/notify';
 import { globalStyles } from '../../../constants/styles';
 import { db } from '../../../services/firebaseconfig';
 
@@ -46,7 +47,7 @@ export default function CategoriesScreen() {
 
   const addCat = async () => {
     if (!name.trim() || !compID) {
-      Alert.alert('Erro', 'O nome da categoria não pode estar vazio.');
+      notify('Erro', 'O nome da categoria não pode estar vazio.');
       return;
     }
     try {
@@ -55,7 +56,7 @@ export default function CategoriesScreen() {
       });
       setName('');
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível adicionar a categoria.');
+      notify('Erro', 'Não foi possível adicionar a categoria.');
     }
   };
 

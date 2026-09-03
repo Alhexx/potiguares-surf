@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../../constants/styles';
+import { confirmAction, notify } from '../../../lib/notify';
 import { db } from '../../../services/firebaseconfig';
 
 interface Item {
@@ -32,7 +33,7 @@ export default function AdminSchedule() {
   const add = async () => {
     if (!compID) return;
     if (!title.trim()) {
-      Alert.alert('Erro', 'Descreva o item do cronograma.');
+      notify('Erro', 'Descreva o item do cronograma.');
       return;
     }
     try {
@@ -43,20 +44,15 @@ export default function AdminSchedule() {
       setTime('');
       setTitle('');
     } catch {
-      Alert.alert('Erro', 'Não foi possível adicionar.');
+      notify('Erro', 'Não foi possível adicionar.');
     }
   };
 
   const remove = (id: string) => {
     if (!compID) return;
-    Alert.alert('Remover', 'Apagar este item?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Apagar',
-        style: 'destructive',
-        onPress: () => deleteDoc(doc(db, 'competitions', compID, 'schedule', id)).catch(() => {}),
-      },
-    ]);
+    confirmAction('Remover', 'Apagar este item?', () => {
+      deleteDoc(doc(db, 'competitions', compID, 'schedule', id)).catch(() => {});
+    }, 'Apagar');
   };
 
   return (

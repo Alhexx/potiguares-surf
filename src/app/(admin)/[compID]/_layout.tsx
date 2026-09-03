@@ -1,8 +1,16 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
+import HeaderBack from '@/components/HeaderBack';
 
 export default function CompLayout() {
   return (
-    <Stack screenOptions={{ headerTitleAlign: 'center', headerBackTitle: 'Voltar' }}>
+    <Stack
+      screenOptions={{
+        headerTitleAlign: 'center',
+        headerBackTitle: 'Voltar',
+        headerLeft: Platform.OS === 'web' ? () => <HeaderBack /> : undefined,
+      }}
+    >
       <Stack.Screen name="index" options={{ title: "Gerenciar Evento" }} />
       <Stack.Screen name="edit-config" options={{ title: "Cores das Lycras" }} />
       <Stack.Screen name="schedule" options={{ title: "Cronograma" }} />

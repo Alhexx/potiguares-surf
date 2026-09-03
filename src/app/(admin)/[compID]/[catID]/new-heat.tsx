@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../../../lib/notify';
 import { globalStyles } from '../../../../constants/styles';
 import { DEFAULT_LYCRAS, normalizeLycras } from '../../../../lib/lycra';
 import { db } from '../../../../services/firebaseconfig';
@@ -52,7 +53,7 @@ export default function NewHeatScreen() {
 
     const minutes = parseInt(duration, 10);
     if (isNaN(minutes) || minutes <= 0) {
-      Alert.alert('Erro', 'Informe o tempo da bateria em minutos.');
+      notify('Erro', 'Informe o tempo da bateria em minutos.');
       return;
     }
 
@@ -67,10 +68,10 @@ export default function NewHeatScreen() {
         remainingMs: null,
         createdAt: new Date(),
       });
-      Alert.alert('Sucesso', 'Bateria criada!');
+      notify('Sucesso', 'Bateria criada!');
       router.back();
     } catch {
-      Alert.alert('Erro', 'Falha ao salvar bateria.');
+      notify('Erro', 'Falha ao salvar bateria.');
     }
   };
 

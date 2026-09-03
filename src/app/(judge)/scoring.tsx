@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { addDoc, collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../lib/notify';
 import HeatTimer from '../../components/HeatTimer';
 import { globalStyles } from '../../constants/styles';
 import { subTextOn, textOn } from '../../lib/color';
@@ -104,7 +105,7 @@ export default function ScoringScreen() {
 
   const submitScore = async () => {
     if (!score || isNaN(Number(score)) || Number(score) < 0 || Number(score) > 10) {
-      Alert.alert('Nota Inválida', 'Digite um valor entre 0 e 10.');
+      notify('Nota Inválida', 'Digite um valor entre 0 e 10.');
       return;
     }
 
@@ -122,11 +123,11 @@ export default function ScoringScreen() {
         timestamp: new Date().toISOString()
       });
 
-      Alert.alert('Sucesso', `Nota ${score} computada para a ONDA ${waveNumber}!`);
+      notify('Sucesso', `Nota ${score} computada para a ONDA ${waveNumber}!`);
       setScore('');
       setSelectedAthlete(null);
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao enviar a nota.');
+      notify('Erro', 'Falha ao enviar a nota.');
     }
   };
 

@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../../lib/notify';
 import LycraColorPicker from '../../../components/LycraColorPicker';
 import { globalStyles } from '../../../constants/styles';
 import { DEFAULT_LYCRAS, Lycra, normalizeLycras } from '../../../lib/lycra';
@@ -48,15 +49,15 @@ export default function EditConfig() {
       .filter((l) => l.name.length > 0);
 
     if (cleaned.length === 0) {
-      Alert.alert('Erro', 'Defina pelo menos uma lycra com nome.');
+      notify('Erro', 'Defina pelo menos uma lycra com nome.');
       return;
     }
 
     try {
       await updateDoc(doc(db, 'competitions', compID as string), { lycraColors: cleaned });
-      Alert.alert('Sucesso', 'Cores atualizadas!');
+      notify('Sucesso', 'Cores atualizadas!');
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar.');
+      notify('Erro', 'Não foi possível salvar.');
     }
   };
 

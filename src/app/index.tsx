@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../lib/notify';
 // 1. Importações do Firebase
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../services/firebaseconfig'; // Seu caminho correto!
@@ -13,7 +14,7 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!email || !password) return Alert.alert('Erro', 'Preencha todos os campos.');
+    if (!email || !password) return notify('Erro', 'Preencha todos os campos.');
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
@@ -30,7 +31,7 @@ export default function LoginScreen() {
         router.replace('/(admin)/dashboard');
       }
     } catch (e: any) {
-      Alert.alert('Erro', e.message);
+      notify('Erro', e.message);
     } finally {
       setLoading(false);
     }

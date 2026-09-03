@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../../../lib/notify';
 import HeatTimer from '../../../../components/HeatTimer';
 import { globalStyles } from '../../../../constants/styles';
 import { calculateWSL, Wave } from '../../../../lib/wsl';
@@ -69,7 +70,7 @@ export default function HeatControlScreen() {
         remainingMs: null,
       });
     } catch {
-      Alert.alert('Erro', 'Não foi possível iniciar.');
+      notify('Erro', 'Não foi possível iniciar.');
     }
   };
 
@@ -79,7 +80,7 @@ export default function HeatControlScreen() {
     try {
       await updateDoc(heatRef(), { status: 'waiting', remainingMs: left, endsAtMs: null });
     } catch {
-      Alert.alert('Erro', 'Não foi possível pausar.');
+      notify('Erro', 'Não foi possível pausar.');
     }
   };
 
@@ -87,21 +88,21 @@ export default function HeatControlScreen() {
     try {
       await updateDoc(heatRef(), { status: 'finished', endsAtMs: null, remainingMs: null });
     } catch {
-      Alert.alert('Erro', 'Não foi possível encerrar.');
+      notify('Erro', 'Não foi possível encerrar.');
     }
   };
 
   const saveDuration = async () => {
     const minutes = parseInt(durationInput, 10);
     if (isNaN(minutes) || minutes <= 0) {
-      Alert.alert('Erro', 'Tempo inválido.');
+      notify('Erro', 'Tempo inválido.');
       return;
     }
     try {
       await updateDoc(heatRef(), { durationMinutes: minutes });
-      Alert.alert('Ok', 'Tempo da bateria atualizado.');
+      notify('Ok', 'Tempo da bateria atualizado.');
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o tempo.');
+      notify('Erro', 'Não foi possível salvar o tempo.');
     }
   };
 

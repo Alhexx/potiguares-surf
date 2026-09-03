@@ -3,7 +3,8 @@ import { deleteApp, initializeApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { notify } from '../../../../lib/notify';
 import { globalStyles } from '../../../../constants/styles';
 import { db, firebaseConfig } from '../../../../services/firebaseconfig';
 
@@ -17,7 +18,7 @@ export default function CreateJudge() {
 
   const createJudge = async () => {
     if (!email.trim()) {
-      Alert.alert('Erro', 'Informe o e-mail do juiz.');
+      notify('Erro', 'Informe o e-mail do juiz.');
       return;
     }
     setLoading(true);
@@ -40,10 +41,10 @@ export default function CreateJudge() {
       });
 
       await signOut(tmpAuth);
-      Alert.alert('Sucesso', `Juiz criado!\nSenha inicial: ${DEFAULT_PASSWORD}`);
+      notify('Sucesso', `Juiz criado!\nSenha inicial: ${DEFAULT_PASSWORD}`);
       router.back();
     } catch (e: any) {
-      Alert.alert('Erro', e.message);
+      notify('Erro', e.message);
     } finally {
       await deleteApp(tmpApp).catch(() => {});
       setLoading(false);
