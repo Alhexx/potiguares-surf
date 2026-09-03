@@ -21,6 +21,11 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Cloudflare / Firebase CLIs
+.wrangler/
+.firebase/
+firebase-debug.log
+
 # debug
 npm-debug.*
 yarn-debug.*

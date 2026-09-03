@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admin = usuário logado cujo doc users/{uid} tem role == 'admin'.
+    // (defina esse campo no console para as contas de organizador — ver README/instruções)
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Juiz cadastrado NESTA competição.
+    function isJudgeOf(compID) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/competitions/$(compID)/judges/$(request.auth.uid));
+    }
+
+    // Perfis: cada um lê só o próprio; escrita só admin (cria juízes).
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if isAdmin();
+    }
+
+    match /competitions/{compID} {
+      allow read: if true;                 // placar e listas são públicos
+      allow write: if isAdmin();
+
+      match /judges/{judgeUid} {
+        allow read: if true;               // placar público conta os juízes
+        allow write: if isAdmin();
+      }
+
+      match /schedule/{itemId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      match /categories/{catID} {
+        allow read: if true;
+        allow write: if isAdmin();
+
+        match /heats/{heatID} {
+          allow read: if true;
+          allow create, delete: if isAdmin();
+          // admin controla a bateria; o juiz só pode encerrar quando o tempo zera
+          allow update: if isAdmin()
+            || (isJudgeOf(compID)
+                && request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['status', 'endsAtMs', 'remainingMs']));
+        }
+      }
+    }
+
+    // Notas: qualquer um lê (placar); só o próprio juiz da competição cria; imutáveis.
+    match /waves/{waveID} {
+      allow read: if true;
+      allow create: if isJudgeOf(request.resource.data.compID)
+                    && request.resource.data.judgeId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+  }
+}

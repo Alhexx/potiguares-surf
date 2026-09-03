@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "waves",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "heatID", "order": "ASCENDING" },
+        { "fieldPath": "judgeId", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
