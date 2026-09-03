@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 // 1. Importações do Firebase
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../services/firebaseconfig'; // Seu caminho correto!
@@ -43,9 +43,11 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
-        Potiguares Surf 🏄‍♂️
-      </Text>
+      <Image
+        source={require('../../assets/images/logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
       <Text style={styles.subtitle}>Eventos</Text>
 
       <View style={styles.formContainer}>
@@ -99,16 +101,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  title: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#0284C7',
+  logo: {
+    width: 220,
+    height: 220,
+    alignSelf: 'center',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
     color: '#6B7280',
-    marginBottom: 48,
+    marginBottom: 40,
   },
   formContainer: {
     width: '100%',
