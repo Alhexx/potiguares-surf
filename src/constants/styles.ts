@@ -1,5 +1,8 @@
 import { StyleSheet } from 'react-native';
 
+/** Cor do placeholder — passe em placeholderTextColor nos TextInput. */
+export const PLACEHOLDER = '#9CA3AF';
+
 export const globalStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6', padding: 24 },
   card: {
@@ -22,6 +25,7 @@ export const globalStyles = StyleSheet.create({
     padding: 14,
     marginBottom: 16,
     fontSize: 16,
+    color: '#111827',
   },
   primaryButton: { backgroundColor: '#0284C7', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 8 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },

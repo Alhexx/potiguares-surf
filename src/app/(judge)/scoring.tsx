@@ -1,8 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import HeatTimer from '../../components/HeatTimer';
 import { globalStyles } from '../../constants/styles';
+import { subTextOn, textOn } from '../../lib/color';
 import { auth, db } from '../../services/firebaseconfig';
 
 export default function ScoringScreen() {
@@ -13,6 +15,7 @@ export default function ScoringScreen() {
   
   const [JUDGE_ID, setJUDGE_ID] = useState<string>('juiz_teste_1');
   const [waveCountMap, setWaveCountMap] = useState<Record<string, number>>({});
+  const [access, setAccess] = useState<'checking' | 'ok' | 'denied'>('checking');
 
   // 1. Identifica o usuário logado
   useEffect(() => {
@@ -23,6 +26,14 @@ export default function ScoringScreen() {
     });
     return unsub;
   }, []);
+
+  // 1b. Confere se este juiz pertence a esta competição
+  useEffect(() => {
+    if (!compID || !JUDGE_ID || JUDGE_ID === 'juiz_teste_1') return;
+    getDoc(doc(db, 'competitions', compID as string, 'judges', JUDGE_ID))
+      .then((snap) => setAccess(snap.exists() ? 'ok' : 'denied'))
+      .catch(() => setAccess('denied'));
+  }, [compID, JUDGE_ID]);
 
   // 2. Busca a Bateria Ao Vivo (Live)
   useEffect(() => {
@@ -119,10 +130,16 @@ export default function ScoringScreen() {
     }
   };
 
-  const getLycraColor = (lycra: string) => {
-    const colors: any = { 'Vermelho': '#EF4444', 'Branco': '#F9FAFB', 'Amarelo': '#FBBF24', 'Azul': '#3B82F6', 'Preto': '#111827' };
-    return colors[lycra] || '#9CA3AF';
-  };
+  if (access === 'denied') {
+    return (
+      <View style={[globalStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={globalStyles.title}>Sem acesso</Text>
+        <Text style={{ color: '#6B7280', textAlign: 'center', marginTop: 8 }}>
+          Você não está cadastrado como juiz nesta competição.
+        </Text>
+      </View>
+    );
+  }
 
   if (!liveHeat) {
     return (
@@ -134,7 +151,23 @@ export default function ScoringScreen() {
 
   return (
     <View style={globalStyles.container}>
-      <Text style={[globalStyles.title, { textAlign: 'center', color: '#EF4444' }]}>● BATERIA AO VIVO</Text>
+      <Text style={[globalStyles.title, { textAlign: 'center', color: '#EF4444', marginBottom: 4 }]}>● BATERIA AO VIVO</Text>
+      <HeatTimer
+        style={{ textAlign: 'center', fontSize: 32, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}
+        status={liveHeat.status ?? 'live'}
+        endsAtMs={liveHeat.endsAtMs}
+        durationMinutes={liveHeat.durationMinutes}
+        remainingMs={liveHeat.remainingMs}
+        onExpire={() => {
+          // fallback: se o tempo zera e a direção não encerrou, encerra daqui
+          if (liveHeat?.id && liveHeat?.catID) {
+            updateDoc(
+              doc(db, 'competitions', compID as string, 'categories', liveHeat.catID, 'heats', liveHeat.id),
+              { status: 'finished', endsAtMs: null, remainingMs: null },
+            ).catch(() => {});
+          }
+        }}
+      />
 
       {!selectedAthlete ? (
         <>
@@ -142,32 +175,24 @@ export default function ScoringScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             {(liveHeat?.athletes ?? []).map((ath: any, i: number) => {
               const waveNum = ath?.name ? getNextWaveNumberForAthlete(ath.name) : 1;
-              
+              const color = ath?.lycraColor ?? '#9CA3AF';
+
               return (
                 <TouchableOpacity
                   key={i}
-                  style={[styles.lycraBtn, { backgroundColor: getLycraColor(ath?.lycra ?? 'Desconhecida') }]}
+                  style={[styles.lycraBtn, { backgroundColor: color }]}
                   onPress={() => setSelectedAthlete(ath)}
                 >
-                  <Text style={{ 
-                    color: (ath?.lycra === 'Branco' || ath?.lycra === 'Amarelo') ? '#000' : '#FFF', 
-                    fontWeight: 'bold', 
-                    fontSize: 18 
-                  }}>
+                  <Text style={{ color: textOn(color), fontWeight: 'bold', fontSize: 18 }}>
                     {ath?.lycra ?? 'N/A'}
                   </Text>
-                  
-                  <Text style={{ 
-                    color: (ath?.lycra === 'Branco' || ath?.lycra === 'Amarelo') ? '#333' : '#E5E7EB' 
-                  }}>
+
+                  <Text style={{ color: subTextOn(color) }}>
                     {ath?.name || 'Sem nome'}
                   </Text>
 
                   <View style={{ backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 8 }}>
-                    <Text style={{ 
-                      color: (ath?.lycra === 'Branco' || ath?.lycra === 'Amarelo') ? '#000' : '#FFF', 
-                      fontSize: 12 
-                    }}>
+                    <Text style={{ color: textOn(color), fontSize: 12 }}>
                       Julgar Onda {waveNum}
                     </Text>
                   </View>

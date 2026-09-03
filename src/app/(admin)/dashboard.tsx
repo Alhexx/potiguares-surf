@@ -69,8 +69,8 @@ export default function AdminDashboard() {
 
       <View style={styles.form}>
         <Text style={styles.label}>Criar Nova Competição</Text>
-        <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-        <TextInput style={styles.input} placeholder="Local" value={location} onChangeText={setLocation} />
+        <TextInput style={styles.input} placeholder="Nome" placeholderTextColor="#9CA3AF" value={name} onChangeText={setName} />
+        <TextInput style={styles.input} placeholder="Local" placeholderTextColor="#9CA3AF" value={location} onChangeText={setLocation} />
         <TouchableOpacity style={styles.button} onPress={handleCreateCompetition}>
           <Text style={styles.buttonText}>Salvar Competição</Text>
         </TouchableOpacity>
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#111827', marginBottom: 24 },
   form: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, marginBottom: 32 },
   label: { fontSize: 18, fontWeight: '600', marginBottom: 16, color: '#374151' },
-  input: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 16 },
+  input: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 16, color: '#111827' },
   button: { backgroundColor: '#0284C7', padding: 14, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   listTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 16 },

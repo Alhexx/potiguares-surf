@@ -18,9 +18,14 @@ export default function LoginScreen() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
-      if (userDoc.exists() && userDoc.data().role === 'judge') {
-        router.replace('/(judge)/dashboard');
+      const data = userDoc.exists() ? userDoc.data() : null;
+
+      if (data?.role === 'judge') {
+        if (data.compID) {
+          router.replace({ pathname: '/(judge)/scoring', params: { compID: data.compID } });
+        } else {
+          router.replace('/(judge)/dashboard');
+        }
       } else {
         router.replace('/(admin)/dashboard');
       }
@@ -38,22 +43,26 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Potiguares Surf 🏄‍♂️</Text>
+      <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
+        Potiguares Surf 🏄‍♂️
+      </Text>
       <Text style={styles.subtitle}>Eventos</Text>
 
       <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
           placeholder="E-mail (ex: admin@surf.com)"
+          placeholderTextColor="#9CA3AF"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Senha"
+          placeholderTextColor="#9CA3AF"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -113,6 +122,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     fontSize: 16,
+    color: '#111827',
   },
   primaryButton: {
     backgroundColor: '#0284C7',

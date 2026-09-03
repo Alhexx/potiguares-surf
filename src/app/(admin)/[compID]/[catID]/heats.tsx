@@ -15,6 +15,8 @@ interface Heat {
   id: string;
   status: 'waiting' | 'live' | 'finished';
   athletes?: Athlete[];
+  name?: string;
+  durationMinutes?: number;
   createdAt?: any;
 }
 
@@ -73,14 +75,17 @@ export default function HeatsListScreen() {
             })}
           >
             <View style={globalStyles.rowInfo}>
-              <Text style={globalStyles.rowText}>Bateria {index + 1}</Text>
-              <Text style={{ 
-                color: item.status === 'live' ? '#EF4444' : '#0284C7', 
-                fontWeight: 'bold' 
+              <Text style={globalStyles.rowText}>{item.name?.trim() || `Bateria ${index + 1}`}</Text>
+              <Text style={{
+                color: item.status === 'live' ? '#EF4444' : '#0284C7',
+                fontWeight: 'bold'
               }}>
                 {item.status.toUpperCase()}
               </Text>
             </View>
+            {item.durationMinutes ? (
+              <Text style={{ marginTop: 4, color: '#9CA3AF', fontSize: 12 }}>⏱ {item.durationMinutes} min</Text>
+            ) : null}
             <Text style={{ marginTop: 8, color: '#6B7280' }}>
               {/* Proteção segura contra lista de atletas vazia */}
               {(item.athletes ?? []).length > 0 

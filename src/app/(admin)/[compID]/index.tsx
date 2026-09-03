@@ -12,6 +12,9 @@ export default function CompetitionHub() {
       <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/edit-config`)}>
         <Text style={styles.btnText}>⚙️ Configurar Lycras</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/schedule`)}>
+        <Text style={styles.btnText}>🗓️ Cronograma</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/categories`)}>
         <Text style={styles.btnText}>🏆 Ver Categorias</Text>
       </TouchableOpacity>
