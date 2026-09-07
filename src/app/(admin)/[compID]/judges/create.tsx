@@ -8,7 +8,11 @@ import { notify } from '../../../../lib/notify';
 import { globalStyles } from '../../../../constants/styles';
 import { db, firebaseConfig } from '../../../../services/firebaseconfig';
 
-const DEFAULT_PASSWORD = '123456';
+// Senha padrão = parte do e-mail antes do @ + "123!"  (ex: joao.silva123!)
+const defaultPasswordFor = (email: string) => {
+  const prefix = email.trim().toLowerCase().split('@')[0];
+  return prefix ? `${prefix}123!` : '';
+};
 
 export default function CreateJudge() {
   const { compID } = useLocalSearchParams();
@@ -16,9 +20,12 @@ export default function CreateJudge() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const cleanEmail = email.trim().toLowerCase();
+  const password = defaultPasswordFor(cleanEmail);
+
   const createJudge = async () => {
-    if (!email.trim()) {
-      notify('Erro', 'Informe o e-mail do juiz.');
+    if (!cleanEmail.includes('@') || !password) {
+      notify('Erro', 'Informe um e-mail válido.');
       return;
     }
     setLoading(true);
@@ -28,10 +35,10 @@ export default function CreateJudge() {
     const tmpAuth = getAuth(tmpApp);
 
     try {
-      const cred = await createUserWithEmailAndPassword(tmpAuth, email.trim().toLowerCase(), DEFAULT_PASSWORD);
+      const cred = await createUserWithEmailAndPassword(tmpAuth, cleanEmail, password);
 
       await setDoc(doc(db, 'competitions', compID as string, 'judges', cred.user.uid), {
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         role: 'judge',
       });
       // Vínculo global: o login usa isto para mandar o juiz direto para a competição dele.
@@ -41,7 +48,7 @@ export default function CreateJudge() {
       });
 
       await signOut(tmpAuth);
-      notify('Sucesso', `Juiz criado!\nSenha inicial: ${DEFAULT_PASSWORD}`);
+      notify('Sucesso', `Juiz criado!\nSenha: ${password}`);
       router.back();
     } catch (e: any) {
       notify('Erro', e.message);
@@ -65,7 +72,8 @@ export default function CreateJudge() {
           placeholderTextColor="#9CA3AF"
         />
         <Text style={{ color: '#6B7280', marginBottom: 12 }}>
-          Senha inicial: {DEFAULT_PASSWORD} (o juiz pode trocar depois)
+          Senha: <Text style={{ fontWeight: 'bold', color: '#111827' }}>{password || '—'}</Text>
+          {'  '}(o juiz pode trocar depois)
         </Text>
         <TouchableOpacity
           style={[globalStyles.primaryButton, loading && { opacity: 0.6 }]}
