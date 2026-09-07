@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { notify } from '../lib/notify';
 // 1. Importações do Firebase
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../services/firebaseconfig'; // Seu caminho correto!
 
 export default function LoginScreen() {
@@ -21,14 +21,17 @@ export default function LoginScreen() {
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       const data = userDoc.exists() ? userDoc.data() : null;
 
-      if (data?.role === 'judge') {
+      if (data?.role === 'admin') {
+        router.replace('/(admin)/dashboard');
+      } else if (data?.role === 'judge') {
         if (data.compID) {
           router.replace({ pathname: '/(judge)/scoring', params: { compID: data.compID } });
         } else {
           router.replace('/(judge)/dashboard');
         }
       } else {
-        router.replace('/(admin)/dashboard');
+        await signOut(auth);
+        notify('Sem permissão', 'Esta conta não tem acesso ao sistema. Fale com o organizador.');
       }
     } catch (e: any) {
       notify('Erro', e.message);

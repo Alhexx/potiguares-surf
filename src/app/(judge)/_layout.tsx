@@ -1,8 +1,10 @@
+import AuthGate from '@/components/AuthGate';
 import LogoutButton from '@/components/LogoutButton';
 import { Stack } from 'expo-router';
 
 export default function JudgeLayout() {
   return (
+    <AuthGate role="judge">
     <Stack>
       <Stack.Screen
         name="dashboard"
@@ -21,5 +23,6 @@ export default function JudgeLayout() {
         }}
       />
     </Stack>
+    </AuthGate>
   );
 }

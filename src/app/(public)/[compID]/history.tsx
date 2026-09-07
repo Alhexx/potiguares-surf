@@ -1,66 +1,20 @@
 import { useLocalSearchParams } from 'expo-router';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { isLightColor } from '../../../lib/color';
-import { calculateWSL } from '../../../lib/wsl';
-import { db } from '../../../services/firebaseconfig';
-
-interface HeatResult {
-  id: string;
-  catName: string;
-  name: string;
-  ranking: { name: string; lycra: string; lycraColor?: string; total: string; onda1: string; onda2: string }[];
-}
+import { CompetitionResults, fetchCompetitionResults } from '../../../lib/results';
 
 export default function PublicHistory() {
   const { compID } = useLocalSearchParams();
-  const [items, setItems] = useState<HeatResult[]>([]);
+  const [data, setData] = useState<CompetitionResults | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!compID) return;
     let cancelled = false;
-
-    // ponytail: busca sequencial (categorias -> baterias -> ondas). Ok para
-    // competições com dezenas de baterias; se crescer, virar collectionGroup + índice.
-    (async () => {
-      try {
-        const cats = await getDocs(collection(db, 'competitions', compID as string, 'categories'));
-        const results: HeatResult[] = [];
-
-        for (const cat of cats.docs) {
-          const heats = await getDocs(
-            query(
-              collection(db, 'competitions', compID as string, 'categories', cat.id, 'heats'),
-              where('status', '==', 'finished'),
-            ),
-          );
-
-          for (const h of heats.docs) {
-            const hd = h.data();
-            const wavesSnap = await getDocs(query(collection(db, 'waves'), where('heatID', '==', h.id)));
-            const waves = wavesSnap.docs.map((d) => d.data() as any);
-
-            const ranking = (hd.athletes ?? [])
-              .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name) }))
-              .sort((x: any, y: any) => parseFloat(y.total) - parseFloat(x.total));
-
-            results.push({
-              id: h.id,
-              catName: (cat.data() as any).name ?? 'Categoria',
-              name: (hd.name ?? '').trim() || 'Bateria',
-              ranking,
-            });
-          }
-        }
-
-        if (!cancelled) setItems(results);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
+    fetchCompetitionResults(compID as string)
+      .then((r) => !cancelled && setData(r))
+      .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
@@ -74,17 +28,21 @@ export default function PublicHistory() {
     );
   }
 
+  const heats = (data?.categories ?? []).flatMap((cat) =>
+    cat.heats.map((h) => ({ ...h, catName: cat.name })),
+  );
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Baterias Encerradas</Text>
 
-      {items.length === 0 && (
+      {heats.length === 0 && (
         <Text style={{ color: '#9CA3AF', textAlign: 'center', marginTop: 24 }}>
           Nenhuma bateria encerrada ainda.
         </Text>
       )}
 
-      {items.map((heat) => (
+      {heats.map((heat) => (
         <View key={heat.id} style={styles.card}>
           <Text style={styles.heatName}>{heat.name}</Text>
           <Text style={styles.catName}>{heat.catName}</Text>

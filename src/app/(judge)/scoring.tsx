@@ -104,7 +104,9 @@ export default function ScoringScreen() {
   };
 
   const submitScore = async () => {
-    if (!score || isNaN(Number(score)) || Number(score) < 0 || Number(score) > 10) {
+    // iPhone em pt-BR manda vírgula no teclado decimal — normaliza pra ponto.
+    const value = parseFloat(String(score).replace(',', '.'));
+    if (isNaN(value) || value < 0 || value > 10) {
       notify('Nota Inválida', 'Digite um valor entre 0 e 10.');
       return;
     }
@@ -117,13 +119,13 @@ export default function ScoringScreen() {
         heatID: liveHeat.id,
         athlete: selectedAthlete.name,
         lycra: selectedAthlete.lycra,
-        score: parseFloat(score),
+        score: value,
         judgeId: JUDGE_ID,
         waveNumber: waveNumber,
         timestamp: new Date().toISOString()
       });
 
-      notify('Sucesso', `Nota ${score} computada para a ONDA ${waveNumber}!`);
+      notify('Sucesso', `Nota ${value.toFixed(1)} computada para a ONDA ${waveNumber}!`);
       setScore('');
       setSelectedAthlete(null);
     } catch (error) {
@@ -214,7 +216,7 @@ export default function ScoringScreen() {
             placeholder="0.0"
             keyboardType="decimal-pad"
             value={score}
-            onChangeText={setScore}
+            onChangeText={(t) => setScore(t.replace(',', '.').replace(/[^0-9.]/g, ''))}
             maxLength={4}
           />
           <TouchableOpacity style={[globalStyles.primaryButton, { backgroundColor: '#10B981', marginTop: 20 }]} onPress={submitScore}>

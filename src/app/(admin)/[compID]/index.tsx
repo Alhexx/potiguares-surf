@@ -18,6 +18,9 @@ export default function CompetitionHub() {
       <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/categories`)}>
         <Text style={styles.btnText}>🏆 Ver Categorias</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/report`)}>
+        <Text style={styles.btnText}>📄 Relatório (PDF)</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={[styles.btn, { backgroundColor: '#059669' }]} onPress={() => router.push(`/(admin)/${compID}/judges/list`)}>
         <Text style={styles.btnText}>👥 Equipe de Juízes</Text>
       </TouchableOpacity>
