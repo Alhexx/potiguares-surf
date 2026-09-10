@@ -12,6 +12,7 @@ export default function CompLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "Gerenciar Evento" }} />
+      <Stack.Screen name="edit-event" options={{ title: "Editar Evento" }} />
       <Stack.Screen name="edit-config" options={{ title: "Cores das Lycras" }} />
       <Stack.Screen name="schedule" options={{ title: "Cronograma" }} />
       <Stack.Screen name="report" options={{ title: "Relatório" }} />

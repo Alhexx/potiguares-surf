@@ -3,6 +3,8 @@ import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../../../constants/styles';
+import { deleteHeat } from '../../../../lib/admin';
+import { confirmAction, notify } from '../../../../lib/notify';
 import { db } from '../../../../services/firebaseconfig';
 
 // Interfaces tipadas para maior segurança
@@ -27,6 +29,13 @@ export default function HeatsListScreen() {
   
   const router = useRouter();
   const [heats, setHeats] = useState<Heat[]>([]);
+
+  const removeHeat = (h: Heat, label: string) => {
+    if (!compID || !catID) return;
+    confirmAction('Excluir bateria', `Apagar "${label}" e todas as notas dela?`, () => {
+      deleteHeat(compID, catID, h.id).catch(() => notify('Erro', 'Falha ao excluir.'));
+    }, 'Excluir');
+  };
 
   useEffect(() => {
     if (!compID || !catID) return;
@@ -76,12 +85,17 @@ export default function HeatsListScreen() {
           >
             <View style={globalStyles.rowInfo}>
               <Text style={globalStyles.rowText}>{item.name?.trim() || `Bateria ${index + 1}`}</Text>
-              <Text style={{
-                color: item.status === 'live' ? '#EF4444' : '#0284C7',
-                fontWeight: 'bold'
-              }}>
-                {item.status.toUpperCase()}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Text style={{
+                  color: item.status === 'live' ? '#EF4444' : '#0284C7',
+                  fontWeight: 'bold'
+                }}>
+                  {item.status.toUpperCase()}
+                </Text>
+                <TouchableOpacity onPress={() => removeHeat(item, item.name?.trim() || `Bateria ${index + 1}`)} hitSlop={8}>
+                  <Text style={{ color: '#DC2626', fontWeight: 'bold', fontSize: 18 }}>🗑</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             {item.durationMinutes ? (
               <Text style={{ marginTop: 4, color: '#9CA3AF', fontSize: 12 }}>⏱ {item.durationMinutes} min</Text>

@@ -38,6 +38,9 @@ export async function fetchCompetitionResults(compID: string): Promise<Competiti
   const compSnap = await getDoc(doc(db, 'competitions', compID));
   const comp = compSnap.data() ?? {};
 
+  const judgesSnap = await getDocs(collection(db, 'competitions', compID, 'judges'));
+  const totalJudges = judgesSnap.size;
+
   const catsSnap = await getDocs(collection(db, 'competitions', compID, 'categories'));
   const categories: CategoryResult[] = [];
 
@@ -56,7 +59,7 @@ export async function fetchCompetitionResults(compID: string): Promise<Competiti
       const waves = wavesSnap.docs.map((d) => d.data() as any);
 
       const ranking: RankedAthlete[] = (hd.athletes ?? [])
-        .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name) }))
+        .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name, totalJudges) }))
         .sort((x: RankedAthlete, y: RankedAthlete) => parseFloat(y.total) - parseFloat(x.total));
 
       heats.push({ id: h.id, name: (hd.name ?? '').trim() || 'Bateria', ranking });

@@ -14,13 +14,21 @@ export interface WSLResult {
   qtdOndas: number;
 }
 
+/** Valor de uma onda: média simples das notas; só descarta maior/menor com 5+ juízes. */
+function waveValue(scores: number[]): number {
+  if (scores.length >= 5) {
+    const trimmed = [...scores].sort((a, b) => a - b).slice(1, -1);
+    return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+  }
+  return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+
 /**
- * Média no formato WSL: por onda, descarta a maior e a menor nota (quando há
- * 3+ juízes) e tira a média do resto. O total do atleta é a soma das 2 melhores
- * ondas.
+ * Resultado do atleta = soma das 2 melhores ondas.
  *
- * Se `totalJudges` > 0, uma onda só entra na conta depois de receber nota de
- * TODOS os juízes (trava usada no placar ao vivo). Para históricos, passe 0.
+ * `totalJudges` (nº de juízes cadastrados): uma onda só entra na conta depois de
+ * receber nota de TODOS os juízes. Enquanto faltar alguém, a onda não aparece.
+ * Passe 0 só quando não há juízes cadastrados (sem trava).
  */
 export function calculateWSL(
   waves: Wave[],
@@ -35,13 +43,8 @@ export function calculateWSL(
 
   const waveAverages: number[] = [];
   for (const scores of Object.values(byWave)) {
-    if (totalJudges > 0 && scores.length < totalJudges) continue;
-    if (scores.length < 3) {
-      waveAverages.push(scores.reduce((a, b) => a + b, 0) / scores.length);
-    } else {
-      const trimmed = [...scores].sort((a, b) => a - b).slice(1, -1);
-      waveAverages.push(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
-    }
+    if (totalJudges > 0 && scores.length < totalJudges) continue; // aguarda todos os juízes
+    waveAverages.push(waveValue(scores));
   }
 
   waveAverages.sort((a, b) => b - a);

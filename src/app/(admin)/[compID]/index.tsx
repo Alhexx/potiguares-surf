@@ -9,6 +9,9 @@ export default function CompetitionHub() {
   return (
     <View style={globalStyles.container}>
       <Text style={globalStyles.title}>Gerenciar Evento</Text>
+      <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/edit-event`)}>
+        <Text style={styles.btnText}>✏️ Editar / Excluir Evento</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.btn} onPress={() => router.push(`/(admin)/${compID}/edit-config`)}>
         <Text style={styles.btnText}>⚙️ Configurar Lycras</Text>
       </TouchableOpacity>

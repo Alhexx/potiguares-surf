@@ -3,6 +3,8 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../../../constants/styles';
+import { deleteJudge } from '../../../../lib/admin';
+import { confirmAction, notify } from '../../../../lib/notify';
 import { db } from '../../../../services/firebaseconfig';
 
 // Interface para garantir a segurança dos dados do juiz
@@ -41,6 +43,13 @@ export default function ListJudgesForComp() {
     return () => unsubscribe();
   }, [compID]);
 
+  const removeJudge = (j: Judge) => {
+    if (!compID) return;
+    confirmAction('Excluir juiz', `Remover ${j.email} desta competição?`, () => {
+      deleteJudge(compID, j.id).catch(() => notify('Erro', 'Falha ao excluir.'));
+    }, 'Excluir');
+  };
+
   return (
     <View style={globalStyles.container}>
       <TouchableOpacity 
@@ -58,8 +67,11 @@ export default function ListJudgesForComp() {
         data={judges ?? []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={globalStyles.card}>
-            <Text style={globalStyles.rowText}>{item.email}</Text>
+          <View style={[globalStyles.card, globalStyles.rowInfo]}>
+            <Text style={[globalStyles.rowText, { flex: 1 }]}>{item.email}</Text>
+            <TouchableOpacity onPress={() => removeJudge(item)} hitSlop={8}>
+              <Text style={{ color: '#DC2626', fontSize: 16 }}>🗑</Text>
+            </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={

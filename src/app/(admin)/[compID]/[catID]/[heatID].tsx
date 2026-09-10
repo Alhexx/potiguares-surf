@@ -2,9 +2,9 @@ import { useLocalSearchParams } from 'expo-router';
 import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { notify } from '../../../../lib/notify';
 import HeatTimer from '../../../../components/HeatTimer';
 import { globalStyles } from '../../../../constants/styles';
+import { notify } from '../../../../lib/notify';
 import { calculateWSL, Wave } from '../../../../lib/wsl';
 import { db } from '../../../../services/firebaseconfig';
 
@@ -28,7 +28,9 @@ export default function HeatControlScreen() {
   const { compID, catID, heatID } = useLocalSearchParams();
   const [heat, setHeat] = useState<Heat | null>(null);
   const [waves, setWaves] = useState<Wave[]>([]);
+  const [totalJudges, setTotalJudges] = useState(0);
   const [durationInput, setDurationInput] = useState('');
+  const [editNames, setEditNames] = useState<string[] | null>(null);
 
   const heatRef = () =>
     doc(db, 'competitions', compID as string, 'categories', catID as string, 'heats', heatID as string);
@@ -36,8 +38,7 @@ export default function HeatControlScreen() {
   useEffect(() => {
     if (!compID || !catID || !heatID) return;
 
-    const ref = doc(db, 'competitions', compID as string, 'categories', catID as string, 'heats', heatID as string);
-    const unsubscribeHeat = onSnapshot(ref, (docSnap) => {
+    const unsubHeat = onSnapshot(heatRef(), (docSnap) => {
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() } as Heat;
         setHeat(data);
@@ -45,30 +46,31 @@ export default function HeatControlScreen() {
       }
     });
 
+    const unsubJudges = onSnapshot(
+      collection(db, 'competitions', compID as string, 'judges'),
+      (s) => setTotalJudges(s.size),
+    );
+
     const q = query(collection(db, 'waves'), where('heatID', '==', heatID as string));
-    const unsubscribeWaves = onSnapshot(q, (snap) => {
+    const unsubWaves = onSnapshot(q, (snap) => {
       const received = (snap?.docs ?? []).map((d) => ({ id: d.id, ...d.data() } as Wave));
       received.sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
       setWaves(received);
     });
 
     return () => {
-      unsubscribeHeat();
-      unsubscribeWaves();
+      unsubHeat();
+      unsubJudges();
+      unsubWaves();
     };
   }, [compID, catID, heatID]);
 
   const startHeat = async () => {
     if (!heat) return;
     const minutes = heat.durationMinutes ?? 20;
-    // retoma de onde parou, ou começa do tempo cheio
     const ms = heat.remainingMs && heat.remainingMs > 0 ? heat.remainingMs : minutes * 60000;
     try {
-      await updateDoc(heatRef(), {
-        status: 'live',
-        endsAtMs: Date.now() + ms,
-        remainingMs: null,
-      });
+      await updateDoc(heatRef(), { status: 'live', endsAtMs: Date.now() + ms, remainingMs: null });
     } catch {
       notify('Erro', 'Não foi possível iniciar.');
     }
@@ -103,6 +105,18 @@ export default function HeatControlScreen() {
       notify('Ok', 'Tempo da bateria atualizado.');
     } catch {
       notify('Erro', 'Não foi possível salvar o tempo.');
+    }
+  };
+
+  const saveNames = async () => {
+    if (!heat || !editNames) return;
+    const athletes = heat.athletes.map((a, i) => ({ ...a, name: (editNames[i] ?? '').trim() }));
+    try {
+      await updateDoc(heatRef(), { athletes });
+      setEditNames(null);
+      notify('Ok', 'Atletas atualizados.');
+    } catch {
+      notify('Erro', 'Não foi possível salvar os atletas.');
     }
   };
 
@@ -166,16 +180,59 @@ export default function HeatControlScreen() {
         </View>
       </View>
 
+      {/* editar nomes dos atletas */}
+      <View style={globalStyles.card}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[globalStyles.label, { marginBottom: 0 }]}>Atletas</Text>
+          {editNames === null ? (
+            <TouchableOpacity onPress={() => setEditNames(heat.athletes.map((a) => a.name))}>
+              <Text style={{ color: '#0284C7', fontWeight: 'bold' }}>Editar</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <TouchableOpacity onPress={() => setEditNames(null)}>
+                <Text style={{ color: '#6B7280' }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveNames}>
+                <Text style={{ color: '#0284C7', fontWeight: 'bold' }}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {heat.athletes.map((a, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: a.lycraColor ?? '#9CA3AF', borderWidth: 1, borderColor: '#D1D5DB', marginRight: 10 }} />
+            {editNames === null ? (
+              <Text style={{ color: '#111827', fontSize: 15 }}>{a.name || 'Sem nome'} <Text style={{ color: '#9CA3AF' }}>({a.lycra})</Text></Text>
+            ) : (
+              <TextInput
+                style={[globalStyles.input, { flex: 1, marginBottom: 0 }]}
+                value={editNames[i]}
+                placeholder={`Atleta (${a.lycra})`}
+                placeholderTextColor="#9CA3AF"
+                onChangeText={(t) => setEditNames((prev) => prev!.map((v, idx) => (idx === i ? t : v)))}
+              />
+            )}
+          </View>
+        ))}
+      </View>
+
       <Text style={globalStyles.title}>Placar Oficial (Top 2 Ondas)</Text>
+      {totalJudges > 0 && (
+        <Text style={{ color: '#6B7280', marginBottom: 8 }}>
+          Cada onda só entra no placar com as {totalJudges} notas.
+        </Text>
+      )}
 
       {(heat.athletes ?? []).map((ath, i) => {
-        const stats = calculateWSL(waves, ath.name);
+        const stats = calculateWSL(waves, ath.name, totalJudges);
         return (
           <View key={i} style={[globalStyles.card, { borderLeftWidth: 6, borderLeftColor: ath.lycraColor ?? '#9CA3AF' }]}>
             <View style={globalStyles.rowInfo}>
               <View>
                 <Text style={globalStyles.rowText}>{ath.name || 'Sem nome'}</Text>
-                <Text style={{ color: '#6B7280' }}>Lycra {ath.lycra} • {stats.qtdOndas} ondas surfadas</Text>
+                <Text style={{ color: '#6B7280' }}>Lycra {ath.lycra} • {stats.qtdOndas} ondas completas</Text>
                 <View style={{ flexDirection: 'row', marginTop: 8 }}>
                   <View style={{ backgroundColor: '#F3F4F6', padding: 6, borderRadius: 6, marginRight: 8 }}>
                     <Text style={{ fontSize: 12 }}>Top 1: <Text style={{ fontWeight: 'bold' }}>{stats.onda1}</Text></Text>
