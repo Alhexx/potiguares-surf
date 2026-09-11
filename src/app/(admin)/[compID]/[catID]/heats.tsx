@@ -101,10 +101,11 @@ export default function HeatsListScreen() {
               <Text style={{ marginTop: 4, color: '#9CA3AF', fontSize: 12 }}>⏱ {item.durationMinutes} min</Text>
             ) : null}
             <Text style={{ marginTop: 8, color: '#6B7280' }}>
-              {/* Proteção segura contra lista de atletas vazia */}
-              {(item.athletes ?? []).length > 0 
-                ? item.athletes?.map((a) => a.name || `[${a.lycra}]`).join(' x ')
-                : 'Sem atletas definidos'}
+              {/* só lycras com nome preenchido entram no resumo */}
+              {(() => {
+                const named = (item.athletes ?? []).filter((a) => a.name?.trim());
+                return named.length > 0 ? named.map((a) => a.name).join(' x ') : 'Sem atletas definidos';
+              })()}
             </Text>
           </TouchableOpacity>
         )}

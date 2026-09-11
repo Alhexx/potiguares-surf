@@ -176,8 +176,8 @@ export default function ScoringScreen() {
         <>
           <Text style={{ fontSize: 18, marginBottom: 16, textAlign: 'center' }}>De quem foi a onda?</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {(liveHeat?.athletes ?? []).map((ath: any, i: number) => {
-              const waveNum = ath?.name ? getNextWaveNumberForAthlete(ath.name) : 1;
+            {(liveHeat?.athletes ?? []).filter((a: any) => a?.name?.trim()).map((ath: any, i: number) => {
+              const waveNum = getNextWaveNumberForAthlete(ath.name);
               const color = ath?.lycraColor ?? '#9CA3AF';
 
               return (
@@ -191,7 +191,7 @@ export default function ScoringScreen() {
                   </Text>
 
                   <Text style={{ color: subTextOn(color) }}>
-                    {ath?.name || 'Sem nome'}
+                    {ath.name}
                   </Text>
 
                   <View style={{ backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 8 }}>

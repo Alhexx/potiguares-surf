@@ -57,12 +57,21 @@ export default function NewHeatScreen() {
       return;
     }
 
+    // Lycras deixadas em branco não entram na bateria (evita "Sem nome" sobrando nas telas).
+    const namedAthletes = athletes
+      .filter((a) => a.name.trim())
+      .map((a) => ({ ...a, name: a.name.trim() }));
+    if (namedAthletes.length === 0) {
+      notify('Erro', 'Preencha o nome de pelo menos um atleta.');
+      return;
+    }
+
     try {
       const heatRef = collection(db, 'competitions', compID, 'categories', catID, 'heats');
       await addDoc(heatRef, {
         name: name.trim(),
         durationMinutes: minutes,
-        athletes,
+        athletes: namedAthletes,
         status: 'waiting',
         endsAtMs: null,
         remainingMs: null,

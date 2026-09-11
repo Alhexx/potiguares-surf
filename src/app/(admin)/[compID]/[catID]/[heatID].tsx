@@ -200,22 +200,26 @@ export default function HeatControlScreen() {
           )}
         </View>
 
-        {heat.athletes.map((a, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-            <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: a.lycraColor ?? '#9CA3AF', borderWidth: 1, borderColor: '#D1D5DB', marginRight: 10 }} />
-            {editNames === null ? (
-              <Text style={{ color: '#111827', fontSize: 15 }}>{a.name || 'Sem nome'} <Text style={{ color: '#9CA3AF' }}>({a.lycra})</Text></Text>
-            ) : (
-              <TextInput
-                style={[globalStyles.input, { flex: 1, marginBottom: 0 }]}
-                value={editNames[i]}
-                placeholder={`Atleta (${a.lycra})`}
-                placeholderTextColor="#9CA3AF"
-                onChangeText={(t) => setEditNames((prev) => prev!.map((v, idx) => (idx === i ? t : v)))}
-              />
-            )}
-          </View>
-        ))}
+        {heat.athletes.map((a, i) => {
+          // Lycra configurada mas não usada nesta bateria (nome vazio) — não exibe.
+          if (!a.name?.trim()) return null;
+          return (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+              <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: a.lycraColor ?? '#9CA3AF', borderWidth: 1, borderColor: '#D1D5DB', marginRight: 10 }} />
+              {editNames === null ? (
+                <Text style={{ color: '#111827', fontSize: 15 }}>{a.name} <Text style={{ color: '#9CA3AF' }}>({a.lycra})</Text></Text>
+              ) : (
+                <TextInput
+                  style={[globalStyles.input, { flex: 1, marginBottom: 0 }]}
+                  value={editNames[i]}
+                  placeholder={`Atleta (${a.lycra})`}
+                  placeholderTextColor="#9CA3AF"
+                  onChangeText={(t) => setEditNames((prev) => prev!.map((v, idx) => (idx === i ? t : v)))}
+                />
+              )}
+            </View>
+          );
+        })}
       </View>
 
       <Text style={globalStyles.title}>Placar Oficial (Top 2 Ondas)</Text>
@@ -225,13 +229,13 @@ export default function HeatControlScreen() {
         </Text>
       )}
 
-      {(heat.athletes ?? []).map((ath, i) => {
+      {(heat.athletes ?? []).filter((a) => a.name?.trim()).map((ath, i) => {
         const stats = calculateWSL(waves, ath.name, totalJudges);
         return (
           <View key={i} style={[globalStyles.card, { borderLeftWidth: 6, borderLeftColor: ath.lycraColor ?? '#9CA3AF' }]}>
             <View style={globalStyles.rowInfo}>
               <View>
-                <Text style={globalStyles.rowText}>{ath.name || 'Sem nome'}</Text>
+                <Text style={globalStyles.rowText}>{ath.name}</Text>
                 <Text style={{ color: '#6B7280' }}>Lycra {ath.lycra} • {stats.qtdOndas} ondas completas</Text>
                 <View style={{ flexDirection: 'row', marginTop: 8 }}>
                   <View style={{ backgroundColor: '#F3F4F6', padding: 6, borderRadius: 6, marginRight: 8 }}>

@@ -59,6 +59,7 @@ export async function fetchCompetitionResults(compID: string): Promise<Competiti
       const waves = wavesSnap.docs.map((d) => d.data() as any);
 
       const ranking: RankedAthlete[] = (hd.athletes ?? [])
+        .filter((a: any) => a?.name?.trim())
         .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name, totalJudges) }))
         .sort((x: RankedAthlete, y: RankedAthlete) => parseFloat(y.total) - parseFloat(x.total));
 

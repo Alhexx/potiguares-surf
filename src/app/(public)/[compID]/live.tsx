@@ -75,7 +75,8 @@ export default function PublicLiveScore() {
     );
   }
 
-  const sortedAthletes = [...(liveHeat.athletes || [])].sort(
+  const namedAthletes: any[] = (liveHeat.athletes || []).filter((a: any) => a?.name?.trim());
+  const sortedAthletes = namedAthletes.sort(
     (a, b) =>
       parseFloat(calculateWSL(waves, b.name, totalJudges).total) -
       parseFloat(calculateWSL(waves, a.name, totalJudges).total),
