@@ -2,10 +2,11 @@ import { useLocalSearchParams } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { notify } from '../../../lib/notify';
 import LycraColorPicker from '../../../components/LycraColorPicker';
 import { globalStyles } from '../../../constants/styles';
-import { DEFAULT_LYCRAS, Lycra, normalizeLycras } from '../../../lib/lycra';
+import { applyLycraRenames } from '../../../lib/admin';
+import { DEFAULT_LYCRAS, Lycra, newLycraId, normalizeLycras } from '../../../lib/lycra';
+import { notify } from '../../../lib/notify';
 import { db } from '../../../services/firebaseconfig';
 
 const MAX_LYCRAS = 6;
@@ -13,14 +14,19 @@ const MAX_LYCRAS = 6;
 export default function EditConfig() {
   const { compID } = useLocalSearchParams();
   const [lycras, setLycras] = useState<Lycra[]>(DEFAULT_LYCRAS);
+  // snapshot do que estava salvo, pra saber o que mudou de nome/cor ao salvar
+  const [original, setOriginal] = useState<Lycra[]>(DEFAULT_LYCRAS);
   const [picking, setPicking] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
       const compDoc = await getDoc(doc(db, 'competitions', compID as string));
-      if (compDoc.exists() && compDoc.data().lycraColors) {
-        setLycras(normalizeLycras(compDoc.data().lycraColors));
-      }
+      const normalized = compDoc.exists() && compDoc.data().lycraColors
+        ? normalizeLycras(compDoc.data().lycraColors)
+        : DEFAULT_LYCRAS.map((l) => ({ ...l }));
+      setLycras(normalized);
+      setOriginal(normalized);
     };
     fetchConfig();
   }, [compID]);
@@ -36,7 +42,7 @@ export default function EditConfig() {
 
   const addLycra = () => {
     if (lycras.length >= MAX_LYCRAS) return;
-    setLycras((prev) => [...prev, { name: '', color: '#9CA3AF' }]);
+    setLycras((prev) => [...prev, { id: newLycraId(), name: '', color: '#9CA3AF' }]);
   };
 
   const removeLycra = (i: number) => {
@@ -45,7 +51,7 @@ export default function EditConfig() {
 
   const saveConfig = async () => {
     const cleaned = lycras
-      .map((l) => ({ name: l.name.trim(), color: l.color }))
+      .map((l) => ({ id: l.id, name: l.name.trim(), color: l.color }))
       .filter((l) => l.name.length > 0);
 
     if (cleaned.length === 0) {
@@ -53,11 +59,30 @@ export default function EditConfig() {
       return;
     }
 
+    // O que mudou de nome e/ou cor nesta edição, indexado pelo nome ANTIGO —
+    // é isso que propaga pras baterias já criadas (passadas e atuais).
+    const renameMap: Record<string, { name: string; color: string }> = {};
+    for (const orig of original) {
+      const now = cleaned.find((l) => l.id === orig.id);
+      if (!now) continue; // lycra removida — histórico fica como está
+      if (now.name !== orig.name || now.color !== orig.color) {
+        renameMap[orig.name] = { name: now.name, color: now.color };
+      }
+    }
+
+    setSaving(true);
     try {
       await updateDoc(doc(db, 'competitions', compID as string), { lycraColors: cleaned });
-      notify('Sucesso', 'Cores atualizadas!');
+      const updatedHeats = await applyLycraRenames(compID as string, renameMap);
+      setOriginal(cleaned.map((l) => ({ ...l })));
+      notify(
+        'Sucesso',
+        updatedHeats > 0 ? `Cores atualizadas! ${updatedHeats} bateria(s) sincronizada(s).` : 'Cores atualizadas!',
+      );
     } catch {
       notify('Erro', 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -66,11 +91,12 @@ export default function EditConfig() {
       <View style={globalStyles.card}>
         <Text style={globalStyles.label}>Cores de Lycra da competição</Text>
         <Text style={{ color: '#6B7280', marginBottom: 16 }}>
-          Escreva o nome e toque no quadrado para escolher a cor exata.
+          Escreva o nome e toque no quadrado para escolher a cor exata. Mudar nome ou cor aqui
+          atualiza todas as baterias que já usam essa lycra.
         </Text>
 
         {lycras.map((l, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <TouchableOpacity
               onPress={() => setPicking(i)}
               style={{
@@ -104,8 +130,12 @@ export default function EditConfig() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity onPress={saveConfig} style={[globalStyles.primaryButton, { marginTop: 12 }]}>
-          <Text style={globalStyles.primaryButtonText}>Salvar Cores</Text>
+        <TouchableOpacity
+          onPress={saveConfig}
+          disabled={saving}
+          style={[globalStyles.primaryButton, { marginTop: 12, opacity: saving ? 0.6 : 1 }]}
+        >
+          <Text style={globalStyles.primaryButtonText}>{saving ? 'Salvando...' : 'Salvar Cores'}</Text>
         </TouchableOpacity>
       </View>
 

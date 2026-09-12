@@ -44,7 +44,8 @@
     "lint": "expo lint",
     "deploy:web": "expo export -p web && npx wrangler pages deploy dist",
     "deploy:rules": "npx --yes firebase-tools deploy --only firestore:rules",
-    "test:wsl": "node --experimental-strip-types scripts/check-wsl.ts"
+    "test:wsl": "node --experimental-strip-types scripts/check-wsl.ts",
+    "test:lycra": "node --experimental-strip-types scripts/check-lycra-rename.ts"
   },
   "private": true
 }
