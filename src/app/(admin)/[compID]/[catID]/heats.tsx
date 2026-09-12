@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { collection, doc, getDoc, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { globalStyles } from '../../../../constants/styles';
@@ -28,7 +28,22 @@ export default function HeatsListScreen() {
   const catID = Array.isArray(params.catID) ? params.catID[0] : params.catID;
   
   const router = useRouter();
+  const navigation = useNavigation();
   const [heats, setHeats] = useState<Heat[]>([]);
+  const [catName, setCatName] = useState('');
+
+  // Nome real da categoria no título do header e num aviso na tela — pra ficar
+  // óbvio em qual categoria você está antes de adicionar bateria (troca rápida
+  // entre categorias parecidas, tipo "Sub 12 Feminino" / "Sub 12 Masculino", já
+  // causou bateria indo pra categoria errada).
+  useEffect(() => {
+    if (!compID || !catID) return;
+    getDoc(doc(db, 'competitions', compID, 'categories', catID)).then((snap) => {
+      const n = snap.exists() ? (snap.data() as any).name ?? '' : '';
+      setCatName(n);
+      navigation.setOptions({ title: n ? `Baterias — ${n}` : 'Baterias' });
+    });
+  }, [compID, catID, navigation]);
 
   const removeHeat = (h: Heat, label: string) => {
     if (!compID || !catID) return;
@@ -60,11 +75,16 @@ export default function HeatsListScreen() {
 
   return (
     <View style={globalStyles.container}>
-      <TouchableOpacity 
+      <View style={{ backgroundColor: '#E0F2FE', borderRadius: 10, padding: 12, marginBottom: 16, alignItems: 'center' }}>
+        <Text style={{ color: '#0369A1', fontSize: 12, fontWeight: 'bold' }}>CATEGORIA</Text>
+        <Text style={{ color: '#0C4A6E', fontSize: 18, fontWeight: 'bold' }}>{catName || '—'}</Text>
+      </View>
+
+      <TouchableOpacity
         onPress={() => router.push({
           pathname: '/(admin)/[compID]/[catID]/new-heat',
           params: { compID, catID }
-        })} 
+        })}
         style={globalStyles.primaryButton}
       >
         <Text style={globalStyles.primaryButtonText}>+ Adicionar Bateria</Text>

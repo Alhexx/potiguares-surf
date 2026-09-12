@@ -15,7 +15,7 @@ export interface WSLResult {
 }
 
 /** Valor de uma onda: média simples das notas; só descarta maior/menor com 5+ juízes. */
-function waveValue(scores: number[]): number {
+export function waveAverage(scores: number[]): number {
   if (scores.length >= 5) {
     const trimmed = [...scores].sort((a, b) => a - b).slice(1, -1);
     return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
@@ -44,7 +44,7 @@ export function calculateWSL(
   const waveAverages: number[] = [];
   for (const scores of Object.values(byWave)) {
     if (totalJudges > 0 && scores.length < totalJudges) continue; // aguarda todos os juízes
-    waveAverages.push(waveValue(scores));
+    waveAverages.push(waveAverage(scores));
   }
 
   waveAverages.sort((a, b) => b - a);

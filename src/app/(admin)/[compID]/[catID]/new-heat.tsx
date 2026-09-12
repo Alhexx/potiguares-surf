@@ -22,31 +22,40 @@ export default function NewHeatScreen() {
 
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [catName, setCatName] = useState('');
   const [name, setName] = useState('');
   const [duration, setDuration] = useState(DEFAULT_DURATION);
   const [athletes, setAthletes] = useState<AthleteInput[]>([]);
 
+  // Recarrega sempre que compID OU catID mudar — inclusive o nome da categoria,
+  // pra deixar bem visível em qual categoria a bateria está sendo criada
+  // (proteção contra a tela ficar "presa" numa categoria errada ao trocar rápido).
   useEffect(() => {
-    if (!compID) return;
+    if (!compID || !catID) return;
 
-    const fetchLycras = async () => {
+    const fetchData = async () => {
       try {
-        const compDoc = await getDoc(doc(db, 'competitions', compID));
+        const [compDoc, catDoc] = await Promise.all([
+          getDoc(doc(db, 'competitions', compID)),
+          getDoc(doc(db, 'competitions', compID, 'categories', catID)),
+        ]);
+
+        setCatName(catDoc.exists() ? (catDoc.data() as any).name ?? '' : '');
+
         const lycras = compDoc.exists()
           ? normalizeLycras(compDoc.data().lycraColors)
           : DEFAULT_LYCRAS;
-
         setAthletes(lycras.map((l) => ({ name: '', lycra: l.name, lycraColor: l.color })));
       } catch (error) {
-        console.error('Erro ao buscar lycras', error);
+        console.error('Erro ao buscar categoria/lycras', error);
         setAthletes(DEFAULT_LYCRAS.map((l) => ({ name: '', lycra: l.name, lycraColor: l.color })));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLycras();
-  }, [compID]);
+    fetchData();
+  }, [compID, catID]);
 
   const saveHeat = async () => {
     if (!compID || !catID) return;
@@ -77,7 +86,7 @@ export default function NewHeatScreen() {
         remainingMs: null,
         createdAt: new Date(),
       });
-      notify('Sucesso', 'Bateria criada!');
+      notify('Sucesso', catName ? `Bateria criada em "${catName}"!` : 'Bateria criada!');
       router.back();
     } catch {
       notify('Erro', 'Falha ao salvar bateria.');
@@ -94,6 +103,21 @@ export default function NewHeatScreen() {
 
   return (
     <ScrollView style={globalStyles.container}>
+      <View
+        style={{
+          backgroundColor: '#0284C7',
+          borderRadius: 10,
+          padding: 14,
+          marginBottom: 16,
+          alignItems: 'center',
+        }}
+      >
+        <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: 'bold' }}>CRIANDO BATERIA NA CATEGORIA</Text>
+        <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginTop: 2 }}>
+          {catName || '—'}
+        </Text>
+      </View>
+
       <View style={globalStyles.card}>
         <Text style={globalStyles.label}>Nome da bateria</Text>
         <TextInput

@@ -1,10 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import * as Print from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import HeatTimer from '../../../../components/HeatTimer';
 import { globalStyles } from '../../../../constants/styles';
+import { buildAuditTable, JudgeCol } from '../../../../lib/heatAudit';
 import { notify } from '../../../../lib/notify';
+import { buildHeatReportHtml } from '../../../../lib/reportHtml';
 import { calculateWSL, Wave } from '../../../../lib/wsl';
 import { db } from '../../../../services/firebaseconfig';
 
@@ -28,9 +32,15 @@ export default function HeatControlScreen() {
   const { compID, catID, heatID } = useLocalSearchParams();
   const [heat, setHeat] = useState<Heat | null>(null);
   const [waves, setWaves] = useState<Wave[]>([]);
-  const [totalJudges, setTotalJudges] = useState(0);
+  const [judges, setJudges] = useState<JudgeCol[]>([]);
   const [durationInput, setDurationInput] = useState('');
   const [editNames, setEditNames] = useState<string[] | null>(null);
+  const [editingWaveId, setEditingWaveId] = useState<string | null>(null);
+  const [editScore, setEditScore] = useState('');
+  const [names, setNames] = useState({ comp: '', cat: '' });
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const totalJudges = judges.length;
 
   const heatRef = () =>
     doc(db, 'competitions', compID as string, 'categories', catID as string, 'heats', heatID as string);
@@ -38,7 +48,8 @@ export default function HeatControlScreen() {
   useEffect(() => {
     if (!compID || !catID || !heatID) return;
 
-    const unsubHeat = onSnapshot(heatRef(), (docSnap) => {
+    const ref = doc(db, 'competitions', compID as string, 'categories', catID as string, 'heats', heatID as string);
+    const unsubHeat = onSnapshot(ref, (docSnap) => {
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() } as Heat;
         setHeat(data);
@@ -48,8 +59,22 @@ export default function HeatControlScreen() {
 
     const unsubJudges = onSnapshot(
       collection(db, 'competitions', compID as string, 'judges'),
-      (s) => setTotalJudges(s.size),
+      (s) => {
+        // ordem estável (por id do doc) pra coluna de cada juiz não pular de lugar
+        const sorted = s.docs.map((d) => d.id).sort();
+        setJudges(sorted.map((id, i) => ({ id, label: `Árbitro ${i + 1}` })));
+      },
     );
+
+    Promise.all([
+      getDoc(doc(db, 'competitions', compID as string)),
+      getDoc(doc(db, 'competitions', compID as string, 'categories', catID as string)),
+    ]).then(([compSnap, catSnap]) => {
+      setNames({
+        comp: compSnap.exists() ? (compSnap.data() as any).name ?? '' : '',
+        cat: catSnap.exists() ? (catSnap.data() as any).name ?? '' : '',
+      });
+    });
 
     const q = query(collection(db, 'waves'), where('heatID', '==', heatID as string));
     const unsubWaves = onSnapshot(q, (snap) => {
@@ -117,6 +142,52 @@ export default function HeatControlScreen() {
       notify('Ok', 'Atletas atualizados.');
     } catch {
       notify('Erro', 'Não foi possível salvar os atletas.');
+    }
+  };
+
+  const startEditScore = (w: Wave) => {
+    setEditingWaveId(w.id ?? null);
+    setEditScore(w.score.toFixed(1));
+  };
+
+  const saveScore = async (waveId: string) => {
+    // mesma normalização vírgula->ponto do teclado do juiz
+    const value = parseFloat(editScore.replace(',', '.'));
+    if (isNaN(value) || value < 0 || value > 10) {
+      notify('Erro', 'Nota inválida (0 a 10).');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'waves', waveId), { score: value });
+      setEditingWaveId(null);
+    } catch {
+      notify('Erro', 'Não foi possível salvar a nota. Só o admin pode editar.');
+    }
+  };
+
+  const generateHeatReport = async () => {
+    if (!heat) return;
+    const namedAthletes = heat.athletes.filter((a) => a.name?.trim());
+    setGeneratingPdf(true);
+    try {
+      const html = buildHeatReportHtml({
+        compName: names.comp,
+        catName: names.cat,
+        heatName: heat.name?.trim() || 'Bateria',
+        judges,
+        athletes: namedAthletes,
+        waves,
+      });
+      if (Platform.OS === 'web') {
+        await Print.printAsync({ html });
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      }
+    } catch {
+      notify('Erro', 'Falha ao gerar o PDF.');
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -255,17 +326,101 @@ export default function HeatControlScreen() {
         );
       })}
 
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+        <Text style={globalStyles.title}>Relatório Detalhado</Text>
+        <TouchableOpacity
+          onPress={generateHeatReport}
+          disabled={generatingPdf || judges.length === 0}
+          style={{ opacity: generatingPdf || judges.length === 0 ? 0.5 : 1 }}
+        >
+          <Text style={{ color: '#0284C7', fontWeight: 'bold' }}>{generatingPdf ? 'Gerando...' : '📄 Gerar PDF'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {judges.length === 0 ? (
+        <Text style={{ color: '#9CA3AF', marginBottom: 16 }}>Nenhum juiz cadastrado nesta competição ainda.</Text>
+      ) : (
+        (heat.athletes ?? []).filter((a) => a.name?.trim()).map((ath, i) => {
+          const t = buildAuditTable(waves, ath.name, judges);
+          return (
+            <View key={i} style={[globalStyles.card, { paddingHorizontal: 0 }]}>
+              <Text style={{ fontWeight: 'bold', color: '#111827', paddingHorizontal: 16, marginBottom: 8 }}>
+                {ath.name} <Text style={{ color: '#9CA3AF', fontWeight: 'normal' }}>({ath.lycra})</Text>
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ paddingHorizontal: 16 }}>
+                  <View style={{ flexDirection: 'row' }}>
+                    <Text style={[styles.cell, styles.headCell, { width: 70 }]}></Text>
+                    {judges.map((j) => (
+                      <Text key={j.id} style={[styles.cell, styles.headCell]}>{j.label}</Text>
+                    ))}
+                    <Text style={[styles.cell, styles.headCell, styles.mediaCell]}>Média</Text>
+                  </View>
+                  {t.rows.length === 0 ? (
+                    <Text style={{ color: '#9CA3AF', paddingVertical: 8 }}>Nenhuma nota ainda.</Text>
+                  ) : (
+                    t.rows.map((r) => (
+                      <View key={r.waveNumber} style={{ flexDirection: 'row' }}>
+                        <Text style={[styles.cell, { width: 70, textAlign: 'left' }]}>Onda {r.waveNumber}</Text>
+                        {r.cells.map((c, ci) => (
+                          <Text key={ci} style={styles.cell}>{c === null ? '—' : c.toFixed(1)}</Text>
+                        ))}
+                        <Text style={[styles.cell, styles.mediaCell, { fontWeight: 'bold' }]}>
+                          {r.media === null ? '—' : r.media.toFixed(1)}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                  {t.rows.length > 0 && (
+                    <View style={{ flexDirection: 'row', backgroundColor: '#FEF9C3' }}>
+                      <Text style={[styles.cell, { width: 70, textAlign: 'left', fontWeight: 'bold' }]}>Nota Final</Text>
+                      {t.perJudgeTotal.map((v, vi) => (
+                        <Text key={vi} style={[styles.cell, { fontWeight: 'bold' }]}>{v === null ? '—' : v.toFixed(1)}</Text>
+                      ))}
+                      <Text style={[styles.cell, styles.mediaCell, { fontWeight: 'bold' }]}>{t.officialTotal}</Text>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          );
+        })
+      )}
+
       <Text style={[globalStyles.title, { marginTop: 20 }]}>Auditoria de Notas</Text>
+      <Text style={{ color: '#9CA3AF', marginTop: -12, marginBottom: 8 }}>Toque numa nota pra corrigir (erro de digitação, penalidade...).</Text>
       <View style={[globalStyles.card, { marginBottom: 40 }]}>
         {waves.length === 0 ? (
           <Text style={{ color: '#9CA3AF', textAlign: 'center' }}>Nenhuma nota computada.</Text>
         ) : (
           waves.map((item) => (
-            <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F3F4F6' }}>
+            <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F3F4F6' }}>
               <Text style={{ color: '#374151', fontSize: 16 }}>
                 {item.athlete} <Text style={{ fontWeight: 'bold' }}>{'Onda ' + item.waveNumber}</Text>
               </Text>
-              <Text style={{ color: '#0284C7', fontWeight: 'bold', fontSize: 16 }}>{item.score.toFixed(1)}</Text>
+
+              {editingWaveId === item.id ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <TextInput
+                    autoFocus
+                    style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 6, padding: 6, width: 60, textAlign: 'center', color: '#111827', fontSize: 16 }}
+                    keyboardType="decimal-pad"
+                    value={editScore}
+                    onChangeText={(t) => setEditScore(t.replace(',', '.').replace(/[^0-9.]/g, ''))}
+                  />
+                  <TouchableOpacity onPress={() => item.id && saveScore(item.id)} hitSlop={8}>
+                    <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 18 }}>✓</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setEditingWaveId(null)} hitSlop={8}>
+                    <Text style={{ color: '#DC2626', fontWeight: 'bold', fontSize: 18 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => startEditScore(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ color: '#0284C7', fontWeight: 'bold', fontSize: 16 }}>{item.score.toFixed(1)}</Text>
+                  <Text style={{ fontSize: 12 }}>✏️</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))
         )}
@@ -273,3 +428,16 @@ export default function HeatControlScreen() {
     </ScrollView>
   );
 }
+
+const styles = {
+  cell: {
+    width: 64,
+    textAlign: 'center' as const,
+    paddingVertical: 8,
+    color: '#111827',
+    borderBottomWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  headCell: { fontWeight: 'bold' as const, color: '#374151', fontSize: 12 },
+  mediaCell: { color: '#0284C7', backgroundColor: '#F0F9FF' },
+};
