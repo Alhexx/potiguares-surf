@@ -48,4 +48,38 @@ const w = (judgeId: string, waveNumber: number, score: number): Wave => ({
   assert.equal(t.perJudgeTotal[1], null); // j2 não deu nenhuma nota
 }
 
+// interferencia: so a melhor onda conta, as outras ficam marcadas como descartadas
+{
+  const waves = [
+    w('j1', 1, 6), w('j2', 1, 6), w('j3', 1, 6), // media 6
+    w('j1', 2, 9), w('j2', 2, 9), w('j3', 2, 9), // media 9 (melhor)
+    w('j1', 3, 8), w('j2', 3, 8), w('j3', 3, 8), // media 8
+  ];
+  const t = buildAuditTable(waves, 'A', judges, 1);
+  assert.equal(t.officialTotal, '9.00');
+  assert.equal(t.penalized, true);
+  assert.deepEqual(t.rows.map((r) => r.discarded), [true, false, true]);
+}
+
+// desclassificado: zera e descarta tudo
+{
+  const waves = [w('j1', 1, 9), w('j2', 1, 9), w('j3', 1, 9)];
+  const t = buildAuditTable(waves, 'A', judges, 2);
+  assert.equal(t.officialTotal, '0.00');
+  assert.equal(t.disqualified, true);
+  assert.deepEqual(t.rows.map((r) => r.discarded), [true]);
+}
+
+// sem interferencia: as 2 melhores contam, a 3a e' descartada normalmente
+{
+  const waves = [
+    w('j1', 1, 6), w('j2', 1, 6), w('j3', 1, 6),
+    w('j1', 2, 9), w('j2', 2, 9), w('j3', 2, 9),
+    w('j1', 3, 8), w('j2', 3, 8), w('j3', 3, 8),
+  ];
+  const t = buildAuditTable(waves, 'A', judges);
+  assert.equal(t.officialTotal, '17.00'); // 9 + 8
+  assert.deepEqual(t.rows.map((r) => r.discarded), [true, false, false]);
+}
+
 console.log('heat audit ok');

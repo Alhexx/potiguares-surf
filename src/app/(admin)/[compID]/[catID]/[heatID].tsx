@@ -5,9 +5,10 @@ import { shareAsync } from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import HeatTimer from '../../../../components/HeatTimer';
+import InterferenceBadge from '../../../../components/InterferenceBadge';
 import { globalStyles } from '../../../../constants/styles';
 import { buildAuditTable, JudgeCol } from '../../../../lib/heatAudit';
-import { notify } from '../../../../lib/notify';
+import { confirmAction, notify } from '../../../../lib/notify';
 import { buildHeatReportHtml } from '../../../../lib/reportHtml';
 import { calculateWSL, Wave } from '../../../../lib/wsl';
 import { db } from '../../../../services/firebaseconfig';
@@ -26,6 +27,8 @@ interface Heat {
   durationMinutes?: number;
   endsAtMs?: number | null;
   remainingMs?: number | null;
+  /** interferências por atleta: { "Nome do Atleta": 1 } */
+  interferences?: Record<string, number>;
 }
 
 export default function HeatControlScreen() {
@@ -145,6 +148,34 @@ export default function HeatControlScreen() {
     }
   };
 
+  const interfOf = (name: string) => heat?.interferences?.[name] ?? 0;
+
+  const saveInterference = async (name: string, count: number) => {
+    // grava o mapa inteiro (nome de atleta pode ter ponto, que quebraria field path)
+    const next = { ...(heat?.interferences ?? {}), [name]: count };
+    try {
+      await updateDoc(heatRef(), { interferences: next });
+    } catch {
+      notify('Erro', 'Não foi possível salvar a interferência.');
+    }
+  };
+
+  const addInterference = (name: string, count: number) => {
+    const dq = count >= 2;
+    confirmAction(
+      dq ? 'Desclassificar' : 'Marcar interferência',
+      dq
+        ? `2 interferências na mesma bateria: ${name} fica DESCLASSIFICADO e não pontua.`
+        : `${name} passa a contar só a melhor onda — as outras são descartadas.`,
+      () => saveInterference(name, count),
+      dq ? 'Desclassificar' : 'Marcar',
+    );
+  };
+
+  const clearInterference = (name: string) => {
+    confirmAction('Desfazer', `Remover as interferências de ${name}?`, () => saveInterference(name, 0), 'Desfazer');
+  };
+
   const startEditScore = (w: Wave) => {
     setEditingWaveId(w.id ?? null);
     setEditScore(w.score.toFixed(1));
@@ -177,6 +208,7 @@ export default function HeatControlScreen() {
         judges,
         athletes: namedAthletes,
         waves,
+        interferences: heat.interferences ?? {},
       });
       if (Platform.OS === 'web') {
         await Print.printAsync({ html });
@@ -301,26 +333,56 @@ export default function HeatControlScreen() {
       )}
 
       {(heat.athletes ?? []).filter((a) => a.name?.trim()).map((ath, i) => {
-        const stats = calculateWSL(waves, ath.name, totalJudges);
+        const interf = interfOf(ath.name);
+        const stats = calculateWSL(waves, ath.name, totalJudges, interf);
+        const cut = stats.penalized || stats.disqualified;
         return (
           <View key={i} style={[globalStyles.card, { borderLeftWidth: 6, borderLeftColor: ath.lycraColor ?? '#9CA3AF' }]}>
             <View style={globalStyles.rowInfo}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={globalStyles.rowText}>{ath.name}</Text>
                 <Text style={{ color: '#6B7280' }}>Lycra {ath.lycra} • {stats.qtdOndas} ondas completas</Text>
                 <View style={{ flexDirection: 'row', marginTop: 8 }}>
                   <View style={{ backgroundColor: '#F3F4F6', padding: 6, borderRadius: 6, marginRight: 8 }}>
-                    <Text style={{ fontSize: 12 }}>Top 1: <Text style={{ fontWeight: 'bold' }}>{stats.onda1}</Text></Text>
+                    <Text style={[{ fontSize: 12 }, stats.disqualified && styles.struck]}>
+                      Top 1: <Text style={{ fontWeight: 'bold' }}>{stats.onda1}</Text>
+                    </Text>
                   </View>
                   <View style={{ backgroundColor: '#F3F4F6', padding: 6, borderRadius: 6 }}>
-                    <Text style={{ fontSize: 12 }}>Top 2: <Text style={{ fontWeight: 'bold' }}>{stats.onda2}</Text></Text>
+                    <Text style={[{ fontSize: 12 }, cut && styles.struck]}>
+                      Top 2: <Text style={{ fontWeight: 'bold' }}>{stats.onda2}</Text>
+                    </Text>
                   </View>
                 </View>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#111827' }}>{stats.total}</Text>
-                <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 'bold' }}>SOMA (MAX 20)</Text>
+                <Text style={{ fontSize: 36, fontWeight: 'bold', color: stats.disqualified ? '#DC2626' : '#111827' }}>
+                  {stats.disqualified ? 'DQ' : stats.total}
+                </Text>
+                <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 'bold' }}>
+                  {stats.disqualified ? 'DESCLASSIFICADO' : stats.penalized ? 'SÓ A MELHOR ONDA' : 'SOMA (MAX 20)'}
+                </Text>
               </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12, borderTopWidth: 1, borderColor: '#F3F4F6', paddingTop: 12 }}>
+              <InterferenceBadge interferences={interf} />
+              {interf === 0 ? (
+                <TouchableOpacity onPress={() => addInterference(ath.name, 1)} style={styles.interfBtn}>
+                  <Text style={styles.interfBtnText}>⚠️ Marcar interferência</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  {interf < 2 && (
+                    <TouchableOpacity onPress={() => addInterference(ath.name, interf + 1)} style={styles.interfBtn}>
+                      <Text style={styles.interfBtnText}>+1 (desclassifica)</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => clearInterference(ath.name)} style={[styles.interfBtn, { borderColor: '#D1D5DB' }]}>
+                    <Text style={[styles.interfBtnText, { color: '#6B7280' }]}>Desfazer</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         );
@@ -341,12 +403,22 @@ export default function HeatControlScreen() {
         <Text style={{ color: '#9CA3AF', marginBottom: 16 }}>Nenhum juiz cadastrado nesta competição ainda.</Text>
       ) : (
         (heat.athletes ?? []).filter((a) => a.name?.trim()).map((ath, i) => {
-          const t = buildAuditTable(waves, ath.name, judges);
+          const t = buildAuditTable(waves, ath.name, judges, interfOf(ath.name));
           return (
             <View key={i} style={[globalStyles.card, { paddingHorizontal: 0 }]}>
               <Text style={{ fontWeight: 'bold', color: '#111827', paddingHorizontal: 16, marginBottom: 8 }}>
                 {ath.name} <Text style={{ color: '#9CA3AF', fontWeight: 'normal' }}>({ath.lycra})</Text>
               </Text>
+              {t.interferences > 0 && (
+                <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+                  <InterferenceBadge interferences={t.interferences} />
+                  <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
+                    {t.disqualified
+                      ? 'Desclassificado: nenhuma onda conta.'
+                      : 'Interferência: só a melhor onda conta, as riscadas foram descartadas.'}
+                  </Text>
+                </View>
+              )}
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ paddingHorizontal: 16 }}>
                   <View style={{ flexDirection: 'row' }}>
@@ -360,12 +432,16 @@ export default function HeatControlScreen() {
                     <Text style={{ color: '#9CA3AF', paddingVertical: 8 }}>Nenhuma nota ainda.</Text>
                   ) : (
                     t.rows.map((r) => (
-                      <View key={r.waveNumber} style={{ flexDirection: 'row' }}>
-                        <Text style={[styles.cell, { width: 70, textAlign: 'left' }]}>Onda {r.waveNumber}</Text>
+                      <View key={r.waveNumber} style={{ flexDirection: 'row', opacity: r.discarded ? 0.45 : 1 }}>
+                        <Text style={[styles.cell, { width: 70, textAlign: 'left' }, r.discarded && styles.struck]}>
+                          Onda {r.waveNumber}
+                        </Text>
                         {r.cells.map((c, ci) => (
-                          <Text key={ci} style={styles.cell}>{c === null ? '—' : c.toFixed(1)}</Text>
+                          <Text key={ci} style={[styles.cell, r.discarded && styles.struck]}>
+                            {c === null ? '—' : c.toFixed(1)}
+                          </Text>
                         ))}
-                        <Text style={[styles.cell, styles.mediaCell, { fontWeight: 'bold' }]}>
+                        <Text style={[styles.cell, styles.mediaCell, { fontWeight: 'bold' }, r.discarded && styles.struck]}>
                           {r.media === null ? '—' : r.media.toFixed(1)}
                         </Text>
                       </View>
@@ -440,4 +516,14 @@ const styles = {
   },
   headCell: { fontWeight: 'bold' as const, color: '#374151', fontSize: 12 },
   mediaCell: { color: '#0284C7', backgroundColor: '#F0F9FF' },
+  struck: { textDecorationLine: 'line-through' as const, color: '#9CA3AF' },
+  interfBtn: {
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  interfBtnText: { color: '#B45309', fontWeight: 'bold' as const, fontSize: 12 },
 };

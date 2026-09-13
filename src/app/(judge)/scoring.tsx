@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { notify } from '../../lib/notify';
 import HeatTimer from '../../components/HeatTimer';
+import InterferenceBadge from '../../components/InterferenceBadge';
 import { globalStyles } from '../../constants/styles';
 import { subTextOn, textOn } from '../../lib/color';
 import { auth, db } from '../../services/firebaseconfig';
@@ -193,6 +194,12 @@ export default function ScoringScreen() {
                   <Text style={{ color: subTextOn(color) }}>
                     {ath.name}
                   </Text>
+
+                  {(liveHeat?.interferences?.[ath.name] ?? 0) > 0 && (
+                    <View style={{ marginTop: 4 }}>
+                      <InterferenceBadge interferences={liveHeat.interferences[ath.name]} compact />
+                    </View>
+                  )}
 
                   <View style={{ backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 8 }}>
                     <Text style={{ color: textOn(color), fontSize: 12 }}>

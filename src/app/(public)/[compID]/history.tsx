@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import InterferenceBadge from '../../../components/InterferenceBadge';
 import { isLightColor } from '../../../lib/color';
 import { CompetitionResults, fetchCompetitionResults } from '../../../lib/results';
 
@@ -51,10 +52,19 @@ export default function PublicHistory() {
             const color = ath.lycraColor ?? '#9CA3AF';
             return (
               <View key={i} style={styles.rankRow}>
-                <Text style={styles.pos}>{i + 1}º</Text>
+                <Text style={styles.pos}>{ath.disqualified ? '-' : `${i + 1}º`}</Text>
                 <View style={[styles.dot, { backgroundColor: color, borderColor: isLightColor(color) ? '#D1D5DB' : color }]} />
-                <Text style={styles.athName}>{ath.name || 'Sem nome'}</Text>
-                <Text style={styles.total}>{ath.total}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.athName}>{ath.name || 'Sem nome'}</Text>
+                  {ath.interferences > 0 && (
+                    <View style={{ marginTop: 2 }}>
+                      <InterferenceBadge interferences={ath.interferences} compact />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.total, ath.disqualified && { color: '#DC2626' }]}>
+                  {ath.disqualified ? 'DQ' : ath.total}
+                </Text>
               </View>
             );
           })}
@@ -75,6 +85,6 @@ const styles = StyleSheet.create({
   rankRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderColor: '#F3F4F6' },
   pos: { width: 34, fontWeight: 'bold', color: '#374151' },
   dot: { width: 14, height: 14, borderRadius: 4, borderWidth: 1, marginRight: 10 },
-  athName: { flex: 1, fontSize: 15, color: '#111827' },
+  athName: { fontSize: 15, color: '#111827' },
   total: { fontSize: 18, fontWeight: 'bold', color: '#0284C7' },
 });

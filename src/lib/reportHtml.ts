@@ -22,12 +22,18 @@ export function buildReportHtml(r: CompetitionResults): string {
             .map(
               (a, i) => `
               <tr>
-                <td class="pos">${i + 1}º</td>
-                <td>${esc(a.name || 'Sem nome')}</td>
+                <td class="pos">${a.disqualified ? '-' : `${i + 1}º`}</td>
+                <td>${esc(a.name || 'Sem nome')}${
+                  a.disqualified
+                    ? ' <span class="dq">DQ</span>'
+                    : a.penalized
+                      ? ' <span class="interf">INTERF.</span>'
+                      : ''
+                }</td>
                 <td>${esc(a.lycra || '-')}</td>
-                <td class="num">${a.onda1}</td>
-                <td class="num">${a.onda2}</td>
-                <td class="num total">${a.total}</td>
+                <td class="num${a.disqualified ? ' cut' : ''}">${a.onda1}</td>
+                <td class="num${a.disqualified || a.penalized ? ' cut' : ''}">${a.onda2}</td>
+                <td class="num total">${a.disqualified ? 'DQ' : a.total}</td>
               </tr>`,
             )
             .join('');
@@ -61,7 +67,11 @@ export function buildReportHtml(r: CompetitionResults): string {
   td.pos { width: 34px; font-weight: bold; }
   td.num { text-align: right; width: 60px; }
   td.total { font-weight: bold; color: #0284C7; }
+  td.cut { text-decoration: line-through; color: #9CA3AF; }
   tr:first-child td { background: #FEF9C3; }
+  .interf, .dq { padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: bold; color: #FFF; }
+  .interf { background: #F59E0B; }
+  .dq { background: #DC2626; }
 </style></head>
 <body>
   <h1>${esc(r.name)}</h1>
@@ -78,22 +88,24 @@ export interface HeatReportInput {
   judges: JudgeCol[];
   athletes: { name: string; lycra: string }[];
   waves: Wave[];
+  /** interferências por atleta: { "Nome": 1 } */
+  interferences?: Record<string, number>;
 }
 
 /** Relatório de UMA bateria: grade juiz×onda por atleta (auditoria organizada em tabela). */
 export function buildHeatReportHtml(input: HeatReportInput): string {
-  const { compName, catName, heatName, judges, athletes, waves } = input;
+  const { compName, catName, heatName, judges, athletes, waves, interferences = {} } = input;
   const date = new Date().toLocaleString('pt-BR');
 
   const tables = athletes
     .map((a) => {
-      const t = buildAuditTable(waves, a.name, judges);
+      const t = buildAuditTable(waves, a.name, judges, interferences[a.name] ?? 0);
       const judgeHeaders = judges.map((j) => `<th>${esc(j.label)}</th>`).join('');
 
       const rows = t.rows
         .map(
           (r) => `
-          <tr>
+          <tr class="${r.discarded ? 'discarded' : ''}">
             <td class="wave">Onda ${r.waveNumber}</td>
             ${r.cells.map((c) => `<td class="num">${fmt(c)}</td>`).join('')}
             <td class="num media">${fmt(r.media)}</td>
@@ -103,10 +115,18 @@ export function buildHeatReportHtml(input: HeatReportInput): string {
 
       const finalRow = `
         <tr class="final">
-          <td>Nota Final</td>
+          <td>${t.disqualified ? 'Desclassificado' : 'Nota Final'}</td>
           ${t.perJudgeTotal.map((v) => `<td class="num">${fmt(v)}</td>`).join('')}
-          <td class="num media">${t.officialTotal}</td>
+          <td class="num media">${t.disqualified ? 'DQ' : t.officialTotal}</td>
         </tr>`;
+
+      const flag = t.interferences
+        ? `<div class="${t.disqualified ? 'dq' : 'interf'}">${
+            t.disqualified
+              ? `DESCLASSIFICADO — ${t.interferences} interferências, não pontua`
+              : 'INTERFERÊNCIA — só a melhor onda conta; as riscadas foram descartadas'
+          }</div>`
+        : '';
 
       const body = t.rows.length > 0
         ? `${rows}${finalRow}`
@@ -114,6 +134,7 @@ export function buildHeatReportHtml(input: HeatReportInput): string {
 
       return `
         <h3>${esc(a.name)} <span class="muted">(${esc(a.lycra)})</span></h3>
+        ${flag}
         <table>
           <thead><tr><th></th>${judgeHeaders}<th>Média</th></tr></thead>
           <tbody>${body}</tbody>
@@ -137,6 +158,10 @@ export function buildHeatReportHtml(input: HeatReportInput): string {
   td.wave { text-align: left; font-weight: 600; }
   td.media { font-weight: bold; color: #0284C7; background: #F0F9FF; }
   tr.final { background: #FEF9C3; font-weight: bold; }
+  tr.discarded td { text-decoration: line-through; color: #9CA3AF; }
+  .interf, .dq { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #FFF; margin-bottom: 6px; }
+  .interf { background: #F59E0B; }
+  .dq { background: #DC2626; }
 </style></head>
 <body>
   <h1>${esc(heatName)}</h1>

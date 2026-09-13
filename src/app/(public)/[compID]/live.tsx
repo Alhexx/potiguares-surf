@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import HeatTimer from '../../../components/HeatTimer';
+import InterferenceBadge from '../../../components/InterferenceBadge';
 import { isLightColor } from '../../../lib/color';
 import { calculateWSL } from '../../../lib/wsl';
 import { db } from '../../../services/firebaseconfig';
@@ -75,11 +76,14 @@ export default function PublicLiveScore() {
     );
   }
 
+  const interferences: Record<string, number> = liveHeat.interferences ?? {};
+  const interfOf = (name: string) => interferences[name] ?? 0;
+
   const namedAthletes: any[] = (liveHeat.athletes || []).filter((a: any) => a?.name?.trim());
   const sortedAthletes = namedAthletes.sort(
     (a, b) =>
-      parseFloat(calculateWSL(waves, b.name, totalJudges).total) -
-      parseFloat(calculateWSL(waves, a.name, totalJudges).total),
+      parseFloat(calculateWSL(waves, b.name, totalJudges, interfOf(b.name)).total) -
+      parseFloat(calculateWSL(waves, a.name, totalJudges, interfOf(a.name)).total),
   );
 
   return (
@@ -97,15 +101,16 @@ export default function PublicLiveScore() {
       </View>
 
       {sortedAthletes.map((ath: any, index: number) => {
-        const stats = calculateWSL(waves, ath.name, totalJudges);
+        const stats = calculateWSL(waves, ath.name, totalJudges, interfOf(ath.name));
         const bgColor = ath.lycraColor ?? '#9CA3AF';
         const isLight = isLightColor(bgColor);
+        const cut = stats.penalized || stats.disqualified;
 
         return (
           <View key={index} style={[styles.card, { backgroundColor: bgColor }]}>
             <View style={styles.row}>
               <View style={styles.positionBadge}>
-                <Text style={styles.positionText}>{index + 1}º</Text>
+                <Text style={styles.positionText}>{stats.disqualified ? '-' : `${index + 1}º`}</Text>
               </View>
 
               <View style={styles.infoBox}>
@@ -113,11 +118,29 @@ export default function PublicLiveScore() {
                   {ath.name || 'Sem nome'}
                 </Text>
 
+                {stats.interferences > 0 && (
+                  <View style={{ marginBottom: 6 }}>
+                    <InterferenceBadge interferences={stats.interferences} />
+                  </View>
+                )}
+
                 <View style={styles.wavesBox}>
-                  <Text style={[styles.waveText, { color: isLight ? '#374151' : '#E5E7EB' }]}>
+                  <Text
+                    style={[
+                      styles.waveText,
+                      { color: isLight ? '#374151' : '#E5E7EB' },
+                      stats.disqualified && styles.struck,
+                    ]}
+                  >
                     #1: {stats.onda1}
                   </Text>
-                  <Text style={[styles.waveText, { color: isLight ? '#374151' : '#E5E7EB', marginLeft: 16 }]}>
+                  <Text
+                    style={[
+                      styles.waveText,
+                      { color: isLight ? '#374151' : '#E5E7EB', marginLeft: 16 },
+                      cut && styles.struck,
+                    ]}
+                  >
                     #2: {stats.onda2}
                   </Text>
                 </View>
@@ -125,7 +148,7 @@ export default function PublicLiveScore() {
 
               <View style={styles.scoreBox}>
                 <Text style={[styles.totalScore, { color: isLight ? '#111827' : '#FFFFFF' }]}>
-                  {stats.total}
+                  {stats.disqualified ? 'DQ' : stats.total}
                 </Text>
               </View>
             </View>
@@ -158,6 +181,7 @@ const styles = StyleSheet.create({
   waveText: { fontSize: 16, fontWeight: '600' },
   scoreBox: { alignItems: 'flex-end', justifyContent: 'center' },
   totalScore: { fontSize: 40, fontWeight: 'bold' },
+  struck: { textDecorationLine: 'line-through', opacity: 0.6 },
   nav: { flexDirection: 'row', gap: 12 },
   navBtn: { flex: 1, backgroundColor: '#1F2937', borderWidth: 1, borderColor: '#374151', padding: 14, borderRadius: 10, alignItems: 'center' },
   navText: { color: '#E5E7EB', fontWeight: '600' },

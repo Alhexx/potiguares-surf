@@ -9,6 +9,9 @@ export interface RankedAthlete {
   total: string;
   onda1: string;
   onda2: string;
+  interferences: number;
+  disqualified: boolean;
+  penalized: boolean;
 }
 
 export interface HeatResult {
@@ -58,9 +61,10 @@ export async function fetchCompetitionResults(compID: string): Promise<Competiti
       const wavesSnap = await getDocs(query(collection(db, 'waves'), where('heatID', '==', h.id)));
       const waves = wavesSnap.docs.map((d) => d.data() as any);
 
+      const interferences: Record<string, number> = hd.interferences ?? {};
       const ranking: RankedAthlete[] = (hd.athletes ?? [])
         .filter((a: any) => a?.name?.trim())
-        .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name, totalJudges) }))
+        .map((a: any) => ({ ...a, ...calculateWSL(waves, a.name, totalJudges, interferences[a.name] ?? 0) }))
         .sort((x: RankedAthlete, y: RankedAthlete) => parseFloat(y.total) - parseFloat(x.total));
 
       heats.push({ id: h.id, name: (hd.name ?? '').trim() || 'Bateria', ranking });
